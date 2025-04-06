@@ -11,11 +11,4 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="ProductService.API/" />
-    <Folder Include="ProductService.Application/" />
-    <Folder Include="ProductService.Domain/" />
-    <Folder Include="ProductService.Infrastructure/" />
-  </ItemGroup>
-
 </Project>
