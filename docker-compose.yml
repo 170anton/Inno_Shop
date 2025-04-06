@@ -1,0 +1,6 @@
+services:
+  inno_shop:
+    build:
+      context: ./Inno_Shop
+    ports:
+      - "5050:80"
