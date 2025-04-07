@@ -1,6 +1,56 @@
 services:
-  inno_shop:
-    build:
-      context: ./Inno_Shop
+  user-db:
+    image: postgres:17
+    container_name: user_db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: userpassword
+      POSTGRES_DB: UserServiceDb
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
     ports:
-      - "5050:80"
+      - "5433:5432"
+
+  product-db:
+    image: postgres:17
+    container_name: product_db
+    restart: always
+    environment:
+      POSTGRES_USER: product
+      POSTGRES_PASSWORD: productpassword
+      POSTGRES_DB: ProductServiceDb
+    volumes:
+      - product_db_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+
+  user-service:
+    build:
+      context: ./UserService
+      dockerfile: UserService.API/Dockerfile
+    container_name: user_service
+    depends_on:
+      - user-db
+    ports:
+      - "5001:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Default=Host=user-db;Port=5432;Database=UserServiceDb;Username=user;Password=userpassword
+
+  product-service:
+    build:
+      context: ./ProductService
+      dockerfile: ProductService.API/Dockerfile
+    container_name: product_service
+    depends_on:
+      - product-db
+    ports:
+      - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Default=Host=product-db;Port=5432;Database=ProductServiceDb;Username=product;Password=productpassword
+
+volumes:
+  user_db_data:
+  product_db_data:
