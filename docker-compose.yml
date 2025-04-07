@@ -51,6 +51,22 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__Default=Host=product-db;Port=5432;Database=ProductServiceDb;Username=product;Password=productpassword
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - user-db
+      - product-db
+
 volumes:
   user_db_data:
   product_db_data:
+  pgadmin_data:
