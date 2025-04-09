@@ -1,43 +1,62 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-//using UserService.Application.Interfaces;
-using UserService.Domain.Entities;
 using UserService.Domain.Interfaces;
-using UserService.Infrastructure.Data;
 
-namespace UserService.Infrastructure.Repositories;
-
-public class UserRepository : IUserRepository
+namespace UserService.Infrastructure.Repositories
 {
-    private readonly UserDbContext _context;
-
-    public UserRepository(UserDbContext context)
+    public class UserRepository : IUserRepository
     {
-        _context = context;
-    }
+        private readonly UserManager<IdentityUser> _userManager;
 
-    public async Task<IEnumerable<User>> GetAllAsync() => await _context.Users.ToListAsync();
-
-    public async Task<User?> GetByIdAsync(Guid id) => await _context.Users.FindAsync(id);
-
-    public async Task AddAsync(User user)
-    {
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-    }
-
-    public async Task UpdateAsync(User user)
-    {
-        _context.Users.Update(user);
-        await _context.SaveChangesAsync();
-    }
-
-    public async Task DeleteAsync(Guid id)
-    {
-        var user = await _context.Users.FindAsync(id);
-        if (user != null)
+        public UserRepository(UserManager<IdentityUser> userManager)
         {
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
+            _userManager = userManager;
+        }
+
+        public async Task<IEnumerable<IdentityUser>> GetAllAsync()
+        {
+            return await _userManager.Users.ToListAsync();
+        }
+
+        public async Task<IdentityUser?> GetByIdAsync(string id)
+        {
+            return await _userManager.FindByIdAsync(id);
+        }
+
+        public async Task AddAsync(IdentityUser user, string password)
+        {
+            var result = await _userManager.CreateAsync(user, password);
+            if (!result.Succeeded)
+            {
+                throw new Exception("Unable to create user: " + string.Join(", ", result.Errors));
+            }
+        }
+
+        public async Task UpdateAsync(IdentityUser user)
+        {
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                throw new Exception("Unable to update user: " + string.Join(", ", result.Errors));
+            }
+        }
+
+        public async Task DeleteAsync(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                throw new Exception($"User with id '{id}' not found.");
+            }
+            
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                throw new Exception("Unable to delete user: " + string.Join(", ", result.Errors));
+            }
         }
     }
 }

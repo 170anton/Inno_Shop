@@ -1,12 +1,14 @@
-using UserService.Domain.Entities;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 
 namespace UserService.Domain.Interfaces;
 
 public interface IUserRepository
 {
-    Task<IEnumerable<User>> GetAllAsync();
-    Task<User?> GetByIdAsync(Guid id);
-    Task AddAsync(User user);
-    Task UpdateAsync(User user);
-    Task DeleteAsync(Guid id);
+        Task<IEnumerable<IdentityUser>> GetAllAsync();
+        Task<IdentityUser?> GetByIdAsync(string id);
+        Task AddAsync(IdentityUser user, string password);
+        Task UpdateAsync(IdentityUser user);
+        Task DeleteAsync(string id);
 }

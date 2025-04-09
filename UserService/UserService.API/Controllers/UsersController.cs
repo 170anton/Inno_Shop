@@ -1,57 +1,96 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using UserService.API.Models;
 using UserService.Application.Interfaces;
-using UserService.Domain.Entities;
-using UserService.Domain.Interfaces;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 
-namespace UserService.API.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-[Authorize] 
-public class UsersController : ControllerBase
+namespace UserService.API.Controllers
 {
-    private readonly IUserRepository _repository;
-
-    public UsersController(IUserRepository repository)
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
+    public class UsersController : ControllerBase
     {
-        _repository = repository;
-    }
+        private readonly IUserService _userService;
+        
+        public UsersController(IUserService userService)
+        {
+            _userService = userService;
+        }
+        
+        // GET: api/users
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            IEnumerable<IdentityUser> users = await _userService.GetAllAsync();
+            return Ok(users);
+        }
+        
+        // GET: api/users/{id}
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(string id)
+        {
+            IdentityUser? user = await _userService.GetByIdAsync(id);
+            if(user == null)
+                return NotFound();
+            return Ok(user);
+        }
+        
+        // POST: api/users/register
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterUserModel model)
+        {
+            if(!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-    [HttpGet]
-    public async Task<IActionResult> GetAll()
-    {
-        var users = await _repository.GetAllAsync();
-        return Ok(users);
-    }
-
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(Guid id)
-    {
-        var user = await _repository.GetByIdAsync(id);
-        return user is null ? NotFound() : Ok(user);
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> Create(User user)
-    {
-        user.Id = Guid.NewGuid();
-        await _repository.AddAsync(user);
-        return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, User user)
-    {
-        if (id != user.Id) return BadRequest("ID mismatch");
-        await _repository.UpdateAsync(user);
-        return NoContent();
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        await _repository.DeleteAsync(id);
-        return NoContent();
+            // Создаем пользователя Identity
+            var user = new IdentityUser 
+            { 
+                UserName = model.Email, 
+                Email = model.Email 
+            };
+            
+            IdentityResult result = await _userService.RegisterUserAsync(user, model.Password);
+            if(result.Succeeded)
+            {
+                // Можно вернуть CreatedAtAction для получения ссылки на вновь созданного пользователя
+                return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
+            }
+            else
+            {
+                return BadRequest(result.Errors);
+            }
+        }
+        
+        // PUT: api/users/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] UpdateUserModel model)
+        {
+            IdentityUser? user = await _userService.GetByIdAsync(id);
+            if(user == null)
+                return NotFound();
+            
+            user.Email = model.Email;
+            user.UserName = model.Email; // Обычно имя пользователя совпадает с email
+            
+            IdentityResult result = await _userService.UpdateUserAsync(user);
+            if(result.Succeeded)
+                return Ok(user);
+            else
+                return BadRequest(result.Errors);
+        }
+        
+        // DELETE: api/users/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(string id)
+        {
+            IdentityResult result = await _userService.DeleteUserAsync(id);
+            if(result.Succeeded)
+                return NoContent();
+            else
+                return BadRequest(result.Errors);
+        }
     }
 }

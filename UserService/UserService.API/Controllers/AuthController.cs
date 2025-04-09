@@ -1,8 +1,12 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using UserService.API.Models;
 
 namespace UserService.API.Controllers
@@ -11,41 +15,85 @@ namespace UserService.API.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
+        private readonly UserManager<IdentityUser> _userManager;
+        private readonly SignInManager<IdentityUser> _signInManager;
         private readonly IConfiguration _configuration;
-        // Здесь можно внедрить IUserService для проверки логина
 
-        public AuthController(IConfiguration configuration)
+        public AuthController(
+            UserManager<IdentityUser> userManager,
+            SignInManager<IdentityUser> signInManager,
+            IConfiguration configuration)
         {
+            _userManager = userManager;
+            _signInManager = signInManager;
             _configuration = configuration;
         }
 
-        [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginModel login)
+        // POST: api/auth/register
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
-            // Здесь должна быть логика проверки учетных данных.
-            // Для примера допустим, что если логин равен "test" и пароль "password", то данные верны.
-            if (login.Username != "test" || login.Password != "password")
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Создаем нового пользователя
+            var user = new IdentityUser
             {
+                UserName = model.Email,
+                Email = model.Email
+            };
+
+            var result = await _userManager.CreateAsync(user, model.Password);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors);
+
+            // Подтверждение email больше не требуется,
+            // поэтому просто возвращаем сообщение об успешной регистрации.
+            return Ok("Registration successful. You can now log in.");
+        }
+
+        // POST: api/auth/login
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
                 return Unauthorized("Invalid credentials");
-            }
+
+            var signInResult = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
+            if (!signInResult.Succeeded)
+                return Unauthorized("Invalid credentials");
+
+            // Теперь пропускаем проверку подтверждения email
+            var token = GenerateJwtToken(user);
+            return Ok(new { token });
+        }
+
+        // Метод для генерации JWT-токена
+        private string GenerateJwtToken(IdentityUser user)
+        {
+            var jwtSettings = _configuration.GetSection("Jwt");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, login.Username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Sub, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id)
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
             var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(Convert.ToDouble(_configuration["Jwt:ExpireMinutes"])),
+                expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpireMinutes"])),
                 signingCredentials: creds);
 
-            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }
