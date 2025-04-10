@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using UserService.API.Models;
+using UserService.Domain.Entities;
 
 namespace UserService.API.Controllers
 {
@@ -16,14 +17,14 @@ namespace UserService.API.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<IdentityUser> _userManager;
-        private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly UserManager<User> _userManager;
+        private readonly SignInManager<User> _signInManager;
         private readonly IEmailSender _emailSender;
         private readonly IConfiguration _configuration;
 
         public AuthController(
-            UserManager<IdentityUser> userManager,
-            SignInManager<IdentityUser> signInManager,
+            UserManager<User> userManager,
+            SignInManager<User> signInManager,
             IEmailSender emailSender,
             IConfiguration configuration)
         {
@@ -40,7 +41,7 @@ namespace UserService.API.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = new IdentityUser
+            var user = new User
             {
                 UserName = model.Email,
                 Email = model.Email
@@ -156,7 +157,7 @@ namespace UserService.API.Controllers
         }
 
         // Метод для генерации JWT-токена
-        private string GenerateJwtToken(IdentityUser user)
+        private string GenerateJwtToken(User user)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));

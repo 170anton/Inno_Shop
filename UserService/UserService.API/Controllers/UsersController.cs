@@ -5,6 +5,7 @@ using UserService.API.Models;
 using UserService.Application.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
+using UserService.Domain.Entities;
 
 namespace UserService.API.Controllers
 {
@@ -24,7 +25,7 @@ namespace UserService.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            IEnumerable<IdentityUser> users = await _userService.GetAllAsync();
+            IEnumerable<User> users = await _userService.GetAllAsync();
             return Ok(users);
         }
         
@@ -32,7 +33,7 @@ namespace UserService.API.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(string id)
         {
-            IdentityUser? user = await _userService.GetByIdAsync(id);
+            User? user = await _userService.GetByIdAsync(id);
             if(user == null)
                 return NotFound();
             return Ok(user);
@@ -46,7 +47,7 @@ namespace UserService.API.Controllers
                 return BadRequest(ModelState);
 
             // Создаем пользователя Identity
-            var user = new IdentityUser 
+            var user = new User 
             { 
                 UserName = model.Email, 
                 Email = model.Email 
@@ -68,7 +69,7 @@ namespace UserService.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateUserModel model)
         {
-            IdentityUser? user = await _userService.GetByIdAsync(id);
+            User? user = await _userService.GetByIdAsync(id);
             if(user == null)
                 return NotFound();
             

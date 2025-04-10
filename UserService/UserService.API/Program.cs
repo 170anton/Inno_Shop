@@ -10,13 +10,14 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using UserService.API.Services;
+using UserService.Domain.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<UserDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => {
+builder.Services.AddDefaultIdentity<User>(options => {
     options.SignIn.RequireConfirmedAccount = true;
     // Выключаем требование наличия цифр, спецсимволов, строчных и прописных букв
     options.Password.RequireDigit = false;

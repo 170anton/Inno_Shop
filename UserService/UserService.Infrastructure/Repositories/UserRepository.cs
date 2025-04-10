@@ -3,30 +3,31 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using UserService.Domain.Entities;
 using UserService.Domain.Interfaces;
 
 namespace UserService.Infrastructure.Repositories
 {
     public class UserRepository : IUserRepository
     {
-        private readonly UserManager<IdentityUser> _userManager;
+        private readonly UserManager<User> _userManager;
 
-        public UserRepository(UserManager<IdentityUser> userManager)
+        public UserRepository(UserManager<User> userManager)
         {
             _userManager = userManager;
         }
 
-        public async Task<IEnumerable<IdentityUser>> GetAllAsync()
+        public async Task<IEnumerable<User>> GetAllAsync()
         {
             return await _userManager.Users.ToListAsync();
         }
 
-        public async Task<IdentityUser?> GetByIdAsync(string id)
+        public async Task<User?> GetByIdAsync(string id)
         {
             return await _userManager.FindByIdAsync(id);
         }
 
-        public async Task AddAsync(IdentityUser user, string password)
+        public async Task AddAsync(User user, string password)
         {
             var result = await _userManager.CreateAsync(user, password);
             if (!result.Succeeded)
@@ -35,7 +36,7 @@ namespace UserService.Infrastructure.Repositories
             }
         }
 
-        public async Task UpdateAsync(IdentityUser user)
+        public async Task UpdateAsync(User user)
         {
             var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)
