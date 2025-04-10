@@ -147,7 +147,8 @@ namespace UserService.API.Controllers
             if (user == null)
                 return NotFound("User not found.");
 
-            var result = await _userManager.ResetPasswordAsync(user, model.Token, model.NewPassword);
+            string decodedToken = System.Net.WebUtility.UrlDecode(model.Token);
+            var result = await _userManager.ResetPasswordAsync(user, decodedToken, model.NewPassword);
             if (result.Succeeded)
                 return Ok("Password has been reset successfully.");
             else
