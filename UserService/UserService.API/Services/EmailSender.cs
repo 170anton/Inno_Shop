@@ -10,7 +10,6 @@ namespace UserService.API.Services
     {
         public async Task SendEmailAsync(string email, string subject, string htmlMessage)
         {
-            // Создаем MIME-сообщение
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress("NoReply", "noreply@example.com"));
             message.To.Add(new MailboxAddress(email, email));
@@ -19,13 +18,11 @@ namespace UserService.API.Services
             var bodyBuilder = new BodyBuilder { HtmlBody = htmlMessage };
             message.Body = bodyBuilder.ToMessageBody();
 
-            // Подключение к MailDev (SMTP на localhost:1025)
+            // Connect to MailHog SMTP server on localhost:1025
             using (var client = new SmtpClient())
             {
-                // Не используем TLS, так как MailDev не требует его
-                await client.ConnectAsync("maildev", 1025, SecureSocketOptions.None);
-                
-                // MailDev обычно не требует аутентификации, поэтому вызов AuthenticateAsync не нужен
+                await client.ConnectAsync("mailhog", 1025, SecureSocketOptions.None);
+                // MailHog does not require authentication
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
             }

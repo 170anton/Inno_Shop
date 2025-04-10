@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -17,15 +18,18 @@ namespace UserService.API.Controllers
     {
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly IEmailSender _emailSender;
         private readonly IConfiguration _configuration;
 
         public AuthController(
             UserManager<IdentityUser> userManager,
             SignInManager<IdentityUser> signInManager,
+            IEmailSender emailSender,
             IConfiguration configuration)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _emailSender = emailSender;
             _configuration = configuration;
         }
 
@@ -36,7 +40,6 @@ namespace UserService.API.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // Создаем нового пользователя
             var user = new IdentityUser
             {
                 UserName = model.Email,
@@ -47,9 +50,19 @@ namespace UserService.API.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            // Подтверждение email больше не требуется,
-            // поэтому просто возвращаем сообщение об успешной регистрации.
-            return Ok("Registration successful. You can now log in.");
+            // Generate email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var encodedToken = System.Net.WebUtility.UrlEncode(token);
+
+            // Build confirmation URL using client URL from configuration (e.g., Angular/React app)
+            var clientUrl = _configuration["AppSettings:ClientUrl"] ?? "http://localhost:4200";
+            var confirmationUrl = $"{clientUrl}/confirmemail?userId={user.Id}&token={encodedToken}";
+
+            // Send confirmation email using EmailSender configured for MailHog
+            await _emailSender.SendEmailAsync(user.Email, "Confirm your email",
+                $"Please confirm your account by clicking this link: <a href='{confirmationUrl}'>Confirm Email</a>");
+
+            return Ok("Registration successful. Please check your email to confirm your account.");
         }
 
         // POST: api/auth/login
@@ -70,6 +83,75 @@ namespace UserService.API.Controllers
             // Теперь пропускаем проверку подтверждения email
             var token = GenerateJwtToken(user);
             return Ok(new { token });
+        }
+
+        // GET: api/auth/confirmemail?userId=...&token=...
+        [HttpGet("confirmemail")]
+        public async Task<IActionResult> ConfirmEmail(string userId, string token)
+        {
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+                return BadRequest("User Id and token are required.");
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return NotFound($"User with ID '{userId}' not found.");
+
+            string decodedToken = System.Net.WebUtility.UrlDecode(token);
+            var result = await _userManager.ConfirmEmailAsync(user, decodedToken);
+            if (result.Succeeded)
+                return Ok("Email confirmed successfully.");
+            else
+                return BadRequest("Error confirming your email.");
+        }
+
+
+        // POST: api/auth/forgotpassword
+        [HttpPost("forgotpassword")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordModel model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                // For security, do not reveal that the user does not exist
+                return Ok("If an account with that email exists, a password reset link has been sent.");
+            }
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            // URL-encode the token
+            var encodedToken = System.Net.WebUtility.UrlEncode(token);
+
+            // Build the password reset URL (adjust ClientUrl as needed)
+            var clientUrl = _configuration["AppSettings:ClientUrl"] ?? "http://localhost:4200";
+            var resetUrl = $"{clientUrl}/resetpassword?userId={user.Id}&token={encodedToken}";
+
+            await _emailSender.SendEmailAsync(user.Email, "Reset your password",
+                $"Please reset your password by clicking here: <a href='{resetUrl}'>Reset Password</a>");
+
+            return Ok("If an account with that email exists, a password reset link has been sent.");
+        }
+
+        // POST: api/auth/resetpassword
+        [HttpPost("resetpassword")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordModel model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (model.NewPassword != model.ConfirmPassword)
+                return BadRequest("Passwords do not match.");
+
+            var user = await _userManager.FindByIdAsync(model.UserId);
+            if (user == null)
+                return NotFound("User not found.");
+
+            var result = await _userManager.ResetPasswordAsync(user, model.Token, model.NewPassword);
+            if (result.Succeeded)
+                return Ok("Password has been reset successfully.");
+            else
+                return BadRequest(result.Errors);
         }
 
         // Метод для генерации JWT-токена

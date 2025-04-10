@@ -67,13 +67,12 @@ services:
     depends_on:
       - user-db
       - product-db
-  maildev:
-    image: maildev/maildev
-    container_name: maildev
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
     ports:
-      - "1025:1025"  # SMTP
-      - "1080:80"    # Веб-интерфейс
-    command: ["maildev", "--web", "0.0.0.0:80", "--smtp", "0.0.0.0:1025"]
+      - "1025:1025"
+      - "8025:8025"
 
 volumes:
   user_db_data:

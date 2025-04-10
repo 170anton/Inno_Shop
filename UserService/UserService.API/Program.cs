@@ -17,7 +17,7 @@ builder.Services.AddDbContext<UserDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 builder.Services.AddDefaultIdentity<IdentityUser>(options => {
-    options.SignIn.RequireConfirmedAccount = false;
+    options.SignIn.RequireConfirmedAccount = true;
     // Выключаем требование наличия цифр, спецсимволов, строчных и прописных букв
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 1;
