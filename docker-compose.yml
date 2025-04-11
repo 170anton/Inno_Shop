@@ -11,6 +11,11 @@ services:
       - user_db_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
 
   product-db:
     image: postgres:17
@@ -24,6 +29,11 @@ services:
       - product_db_data:/var/lib/postgresql/data
     ports:
       - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
 
   user-service:
     build:
@@ -31,7 +41,8 @@ services:
       dockerfile: UserService.API/Dockerfile
     container_name: user_service
     depends_on:
-      - user-db
+      user-db:
+        condition: service_healthy
     ports:
       - "5001:80"
     environment:
@@ -45,7 +56,8 @@ services:
       dockerfile: ProductService.API/Dockerfile
     container_name: product_service
     depends_on:
-      - product-db
+      product-db:
+        condition: service_healthy
     ports:
       - "5002:80"
     environment:
@@ -67,6 +79,7 @@ services:
     depends_on:
       - user-db
       - product-db
+
   mailhog:
     image: mailhog/mailhog
     container_name: mailhog

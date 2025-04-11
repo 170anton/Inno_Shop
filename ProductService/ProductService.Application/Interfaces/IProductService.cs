@@ -12,5 +12,6 @@ namespace ProductService.Application.Interfaces
         Task AddProductAsync(Product product);
         Task UpdateProductAsync(Product product);
         Task DeleteProductAsync(Guid id);
+        Task SetProductsDeletionStatusAsync(Guid userId, bool isDeleted);
     }
 }

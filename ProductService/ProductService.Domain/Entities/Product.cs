@@ -11,5 +11,6 @@ namespace ProductService.Domain.Entities
         public bool IsAvailable { get; set; }
         public Guid CreatedByUserId { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public bool IsDeleted { get; set; }
     }
 }

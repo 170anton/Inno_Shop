@@ -60,5 +60,20 @@ namespace ProductService.API.Controllers
             await _service.DeleteProductAsync(id);
             return NoContent();
         }
+
+        [HttpPut("deactivate/{userId}")]
+        public async Task<IActionResult> DeactivateProductsByUserId(Guid userId)
+        {
+            await _service.SetProductsDeletionStatusAsync(userId, true);
+            return NoContent();
+        }
+        
+        // PUT: api/products/activate/{userId}
+        [HttpPut("activate/{userId}")]
+        public async Task<IActionResult> ActivateProductsByUserId(Guid userId)
+        {
+            await _service.SetProductsDeletionStatusAsync(userId, false);
+            return NoContent();
+        }
     }
 }

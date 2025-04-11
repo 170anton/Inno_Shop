@@ -40,5 +40,16 @@ namespace ProductService.Application.Services
         {
             await _repository.DeleteAsync(id);
         }
+        public async Task SetProductsDeletionStatusAsync(Guid userId, bool isDeleted)
+        {
+            var products = await _repository.GetProductsByUserIdAsync(userId);
+            
+            foreach (var product in products)
+            {
+                product.IsDeleted = isDeleted;
+            }
+            
+            await _repository.SaveChangesAsync();
+        }
     }
 }

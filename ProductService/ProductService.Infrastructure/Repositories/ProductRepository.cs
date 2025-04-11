@@ -16,10 +16,17 @@ namespace ProductService.Infrastructure.Repositories
         {
             _context = context;
         }
-
         public async Task<IEnumerable<Product>> GetAllAsync()
         {
-            return await _context.Products.ToListAsync();
+            return await _context.Products
+                        .Where(p => !p.IsDeleted)
+                        .ToListAsync();
+        }
+        public async Task<IEnumerable<Product>> GetProductsByUserIdAsync(Guid userId)
+        {
+            return await _context.Products
+                        .Where(p => p.CreatedByUserId == userId)
+                        .ToListAsync();
         }
 
         public async Task<Product?> GetByIdAsync(Guid id)
@@ -47,6 +54,11 @@ namespace ProductService.Infrastructure.Repositories
                 _context.Products.Remove(product);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public async Task SaveChangesAsync()
+        {
+            await _context.SaveChangesAsync();
         }
     }
 }

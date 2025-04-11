@@ -39,32 +39,6 @@ namespace UserService.API.Controllers
             return Ok(user);
         }
         
-        // POST: api/users/register
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterUserModel model)
-        {
-            if(!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            // Создаем пользователя Identity
-            var user = new User 
-            { 
-                UserName = model.Email, 
-                Email = model.Email 
-            };
-            
-            IdentityResult result = await _userService.RegisterUserAsync(user, model.Password);
-            if(result.Succeeded)
-            {
-                // Можно вернуть CreatedAtAction для получения ссылки на вновь созданного пользователя
-                return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
-            }
-            else
-            {
-                return BadRequest(result.Errors);
-            }
-        }
-        
         // PUT: api/users/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateUserModel model)
