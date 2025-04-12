@@ -1,4 +1,4 @@
-namespace UserService.API.Models
+namespace UserService.Application.DTOs
 {
     public class ResetPasswordModel
     {

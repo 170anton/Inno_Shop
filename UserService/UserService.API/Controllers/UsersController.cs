@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using UserService.API.Models;
 using UserService.Application.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using UserService.Domain.Entities;
+using UserService.Application.DTOs;
 
 namespace UserService.API.Controllers
 {

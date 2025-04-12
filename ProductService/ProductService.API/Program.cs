@@ -7,6 +7,9 @@ using ProductService.Domain.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using ProductService.Application.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,7 +40,11 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+
 builder.Services.AddControllers();
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<ProductValidator>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

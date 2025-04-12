@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Identity.UI.Services;
 using UserService.API.Services;
 using UserService.Domain.Entities;
 using UserService.Infrastructure;
+using FluentValidation.AspNetCore;
+using FluentValidation;
+using UserService.Application.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +42,12 @@ builder.Services.AddTransient<IEmailSender, EmailSender>();
 
 
 builder.Services.AddControllers();
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<ForgotPasswordModelValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<RegisterModelValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<ResetPasswordModelValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<UpdateUserModelValidator>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -46,6 +55,7 @@ builder.Services.AddHttpClient<IProductServiceClient, ProductServiceClient>(clie
 {
     client.BaseAddress = new Uri(builder.Configuration["ProductService:BaseUrl"]);
 });
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

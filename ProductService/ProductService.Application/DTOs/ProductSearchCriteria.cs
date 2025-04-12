@@ -1,4 +1,4 @@
-namespace ProductService.Application.Models
+namespace ProductService.Application.DTOs
 {
     public class ProductSearchCriteria
     {

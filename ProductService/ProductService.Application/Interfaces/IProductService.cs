@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using ProductService.Application.Models;
+using ProductService.Application.DTOs;
 using ProductService.Domain.Entities;
 
 namespace ProductService.Application.Interfaces

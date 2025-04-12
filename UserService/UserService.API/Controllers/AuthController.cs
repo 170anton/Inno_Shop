@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using UserService.API.Models;
+using UserService.Application.DTOs;
 using UserService.Domain.Entities;
 
 namespace UserService.API.Controllers

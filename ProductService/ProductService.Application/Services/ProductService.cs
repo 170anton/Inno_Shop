@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using ProductService.Application.DTOs;
 using ProductService.Application.Interfaces;
-using ProductService.Application.Models;
 using ProductService.Domain.Entities;
 using ProductService.Domain.Interfaces;
 
