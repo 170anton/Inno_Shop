@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ProductService.Application.Interfaces;
+using ProductService.Application.Models;
 using ProductService.Domain.Entities;
 
 namespace ProductService.API.Controllers
@@ -74,6 +75,14 @@ namespace ProductService.API.Controllers
         {
             await _service.SetProductsDeletionStatusAsync(userId, false);
             return NoContent();
+        }
+
+        // GET: api/products/search
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchProducts([FromQuery] ProductSearchCriteria criteria)
+        {
+            var products = await _service.SearchProductsAsync(criteria);
+            return Ok(products);
         }
     }
 }

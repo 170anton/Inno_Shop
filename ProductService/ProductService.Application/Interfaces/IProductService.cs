@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ProductService.Application.Models;
 using ProductService.Domain.Entities;
 
 namespace ProductService.Application.Interfaces
@@ -13,5 +14,7 @@ namespace ProductService.Application.Interfaces
         Task UpdateProductAsync(Product product);
         Task DeleteProductAsync(Guid id);
         Task SetProductsDeletionStatusAsync(Guid userId, bool isDeleted);
+        Task<IEnumerable<Product>> SearchProductsAsync(ProductSearchCriteria criteria);
+
     }
 }

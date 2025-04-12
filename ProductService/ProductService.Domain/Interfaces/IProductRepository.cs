@@ -14,5 +14,6 @@ namespace ProductService.Domain.Interfaces
         Task UpdateAsync(Product product);
         Task DeleteAsync(Guid id);
         Task SaveChangesAsync();
+        IQueryable<Product> GetProductsQuery();
     }
 }
