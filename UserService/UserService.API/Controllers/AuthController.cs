@@ -44,22 +44,21 @@ namespace UserService.API.Controllers
             var user = new User
             {
                 UserName = model.Email,
-                Email = model.Email
+                Email = model.Email,
+                Name = model.Name, 
+                Address = model.Address ?? string.Empty
             };
 
             var result = await _userManager.CreateAsync(user, model.Password);
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            // Generate email confirmation token
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var encodedToken = System.Net.WebUtility.UrlEncode(token);
 
-            // Build confirmation URL using client URL from configuration (e.g., Angular/React app)
             var clientUrl = _configuration["AppSettings:ClientUrl"] ?? "http://localhost:4200";
             var confirmationUrl = $"{clientUrl}/confirmemail?userId={user.Id}&token={encodedToken}";
 
-            // Send confirmation email using EmailSender configured for MailHog
             await _emailSender.SendEmailAsync(user.Email, "Confirm your email",
                 $"Please confirm your account by clicking this link: <a href='{confirmationUrl}'>Confirm Email</a>");
 

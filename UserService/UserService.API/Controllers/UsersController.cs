@@ -44,18 +44,32 @@ namespace UserService.API.Controllers
         public async Task<IActionResult> Update(string id, [FromBody] UpdateUserModel model)
         {
             User? user = await _userService.GetByIdAsync(id);
-            if(user == null)
+            if (user == null)
                 return NotFound();
+
+            if (!string.IsNullOrWhiteSpace(model.Email))
+            {
+                user.Email = model.Email;
+                user.UserName = model.Email;
+            }
             
-            user.Email = model.Email;
-            user.UserName = model.Email; // Обычно имя пользователя совпадает с email
+            if (!string.IsNullOrWhiteSpace(model.Name))
+            {
+                user.Name = model.Name;
+            }
             
+            if (!string.IsNullOrWhiteSpace(model.Address))
+            {
+                user.Address = model.Address;
+            }
+
             IdentityResult result = await _userService.UpdateUserAsync(user);
-            if(result.Succeeded)
+            if (result.Succeeded)
                 return Ok(user);
             else
                 return BadRequest(result.Errors);
         }
+
         
         // DELETE: api/users/{id}
         [HttpDelete("{id}")]

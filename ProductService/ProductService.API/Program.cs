@@ -50,6 +50,8 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.UseMiddleware<ProductService.API.Middleware.GlobalExceptionMiddleware>();
+
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
