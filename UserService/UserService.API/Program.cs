@@ -15,6 +15,8 @@ using UserService.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddJsonFile("sharedconfig/jwtsettings.json", optional: false, reloadOnChange: true);
+
 builder.Services.AddDbContext<UserDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 

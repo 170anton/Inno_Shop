@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductService.Application.Interfaces;
 using ProductService.Application.Models;
@@ -7,6 +9,7 @@ namespace ProductService.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _service;
@@ -37,8 +40,13 @@ namespace ProductService.API.Controllers
         // POST: api/products
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Product product)
-        {
-            // Дополнительная валидация может быть добавлена здесь
+        {            
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null)
+                return Unauthorized();
+
+            product.CreatedByUserId = Guid.Parse(userId);
+            
             await _service.AddProductAsync(product);
             return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
         }
@@ -50,6 +58,13 @@ namespace ProductService.API.Controllers
             if (id != product.Id)
                 return BadRequest("ID mismatch");
 
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (currentUserId == null)
+                return Unauthorized();
+
+            if (product.CreatedByUserId.ToString() != currentUserId)
+                return Forbid("You are not allowed to modify this product.");
+
             await _service.UpdateProductAsync(product);
             return NoContent();
         }
@@ -58,6 +73,17 @@ namespace ProductService.API.Controllers
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
+            var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (currentUserId == null)
+                return Unauthorized();
+
+            var product = await _service.GetProductByIdAsync(id);
+            if (product == null)
+                return NotFound();
+
+            if (product.CreatedByUserId.ToString() != currentUserId)
+                return Forbid("You are not allowed to delete this product.");
+
             await _service.DeleteProductAsync(id);
             return NoContent();
         }
