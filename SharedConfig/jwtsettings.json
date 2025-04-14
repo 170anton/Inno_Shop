@@ -1,8 +1,0 @@
-{
-    "Jwt": {
-      "Key": "242g8rfr3es8tg9ag89asr9jas49a6t5h7as3h67a5grs6g",
-      "Issuer": "domain.com",
-      "Audience": "domain.com",
-      "ExpireMinutes": "30"
-    }
-  }

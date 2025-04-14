@@ -7,4 +7,6 @@ public class User : IdentityUser
     public string Name { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string CustomRole { get; set; } = string.Empty;
+    public bool IsActivated { get; set; } = true;
+    
 }

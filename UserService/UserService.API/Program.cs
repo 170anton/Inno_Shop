@@ -15,17 +15,16 @@ using UserService.Infrastructure;
 using FluentValidation.AspNetCore;
 using FluentValidation;
 using UserService.Application.Validators;
+using UserService.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Configuration.AddJsonFile("sharedconfig/jwtsettings.json", optional: false, reloadOnChange: true);
 
 builder.Services.AddDbContext<UserDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 builder.Services.AddDefaultIdentity<User>(options => {
     options.SignIn.RequireConfirmedAccount = true;
-    // Выключаем требование наличия цифр, спецсимволов, строчных и прописных букв
+    
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 1;
     options.Password.RequireNonAlphanumeric = false;
@@ -53,7 +52,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddHttpClient<IProductServiceClient, ProductServiceClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["ProductService:BaseUrl"]);
+    client.BaseAddress = new Uri(builder.Configuration["ProductService:BaseUrl"] 
+    ?? throw new InvalidOperationException("ProductService:BaseUrl is not configured."));
 });
 
 builder.Services.AddAuthentication(options =>
@@ -64,6 +64,7 @@ builder.Services.AddAuthentication(options =>
 .AddJwtBearer(options =>
 {
     var jwtSettings = builder.Configuration.GetSection("Jwt");
+    var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured");
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -72,7 +73,7 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
 });
 

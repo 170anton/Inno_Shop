@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using UserService.Domain.Entities;
 using UserService.Application.DTOs;
+using System.Net.Http.Headers;
 
 namespace UserService.API.Controllers
 {
@@ -15,10 +16,12 @@ namespace UserService.API.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IProductServiceClient _productServiceClient;
         
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, IProductServiceClient productServiceClient)
         {
             _userService = userService;
+            _productServiceClient = productServiceClient;
         }
         
         // GET: api/users
@@ -80,6 +83,55 @@ namespace UserService.API.Controllers
                 return NoContent();
             else
                 return BadRequest(result.Errors);
+        }
+
+
+        // PUT: api/users/{id}/deactivate
+        [HttpPut("{id}/deactivate")]
+        public async Task<IActionResult> Deactivate(string id)
+        {
+            var user = await _userService.GetByIdAsync(id);
+            if (user == null)
+                return NotFound();
+
+            user.IsActivated = false;
+            var result = await _userService.UpdateUserAsync(user);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors);
+
+            var token = HttpContext.Request.Headers["Authorization"].FirstOrDefault()?.Split(' ').Last();
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("No JWT token found.");
+            }
+
+            await _productServiceClient.DeactivateProductsByUserIdAsync(user.Id, token);
+
+            return Ok("User deactivated.");
+        }
+
+        // PUT: api/users/{id}/activate
+        [HttpPut("{id}/activate")]
+        public async Task<IActionResult> Activate(string id)
+        {
+            var user = await _userService.GetByIdAsync(id);
+            if (user == null)
+                return NotFound();
+
+            user.IsActivated = true;
+            var result = await _userService.UpdateUserAsync(user);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors);
+
+            var token = HttpContext.Request.Headers["Authorization"].FirstOrDefault()?.Split(' ').Last();
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("No JWT token found.");
+            }
+
+            await _productServiceClient.ActivateProductsByUserIdAsync(user.Id, token);
+
+            return Ok("User activated.");
         }
     }
 }
