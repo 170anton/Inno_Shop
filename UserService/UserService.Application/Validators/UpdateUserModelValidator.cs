@@ -7,16 +7,18 @@ namespace UserService.Application.Validators
     {
         public UpdateUserModelValidator()
         {
+            RuleFor(x => x.Email)
+                .NotEmpty().WithMessage("Email cannot be empty.")
+                .EmailAddress().WithMessage("A valid email is required.")
+                .When(x => x.Email != null);
 
-            // RuleFor(x => x.Email)
-            //     .NotEmpty().WithMessage("Email is required.")
-            //     .EmailAddress().WithMessage("A valid email is required.");
+            RuleFor(x => x.Name)
+                .NotEmpty().WithMessage("Name cannot be empty.")
+                .When(x => x.Name != null);
 
-            // RuleFor(x => x.Name)
-            //     .NotEmpty().WithMessage("Name is required.");
-            
-            // RuleFor(x => x.Address)
-            //     .NotEmpty().WithMessage("Address is required.");
+            RuleFor(x => x.Address)
+                .MaximumLength(100).WithMessage("Address cannot exceed 100 characters.")
+                .When(x => !string.IsNullOrEmpty(x.Address));
         }
     }
 }

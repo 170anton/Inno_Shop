@@ -37,6 +37,7 @@ builder.Services.AddRazorPages();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService.Application.Services.UserService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 
 

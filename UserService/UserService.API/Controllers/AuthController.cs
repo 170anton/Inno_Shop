@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using UserService.Application.DTOs;
+using UserService.Application.Interfaces;
 using UserService.Domain.Entities;
 
 namespace UserService.API.Controllers
@@ -21,17 +22,20 @@ namespace UserService.API.Controllers
         private readonly SignInManager<User> _signInManager;
         private readonly IEmailSender _emailSender;
         private readonly IConfiguration _configuration;
+        private readonly ITokenService _tokenService;
 
         public AuthController(
             UserManager<User> userManager,
             SignInManager<User> signInManager,
             IEmailSender emailSender,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ITokenService tokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _emailSender = emailSender;
             _configuration = configuration;
+            _tokenService = tokenService;
         }
 
         // POST: api/auth/register
@@ -80,8 +84,7 @@ namespace UserService.API.Controllers
             if (!signInResult.Succeeded)
                 return Unauthorized("Invalid credentials");
 
-            // Теперь пропускаем проверку подтверждения email
-            var token = GenerateJwtToken(user);
+            var token = _tokenService.GenerateJwtToken(user);
             return Ok(new { token });
         }
 
@@ -115,15 +118,12 @@ namespace UserService.API.Controllers
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null)
             {
-                // For security, do not reveal that the user does not exist
                 return Ok("If an account with that email exists, a password reset link has been sent.");
             }
 
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            // URL-encode the token
             var encodedToken = System.Net.WebUtility.UrlEncode(token);
 
-            // Build the password reset URL (adjust ClientUrl as needed)
             var clientUrl = _configuration["AppSettings:ClientUrl"] ?? "http://localhost:4200";
             var resetUrl = $"{clientUrl}/resetpassword?userId={user.Id}&token={encodedToken}";
 
@@ -155,28 +155,27 @@ namespace UserService.API.Controllers
                 return BadRequest(result.Errors);
         }
 
-        // Метод для генерации JWT-токена
-        private string GenerateJwtToken(User user)
-        {
-            var jwtSettings = _configuration.GetSection("Jwt");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        // private string GenerateJwtToken(User user)
+        // {
+        //     var jwtSettings = _configuration.GetSection("Jwt");
+        //     var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
+        //     var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id)
-            };
+        //     var claims = new[]
+        //     {
+        //         new Claim(JwtRegisteredClaimNames.Sub, user.Email),
+        //         new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        //         new Claim(ClaimTypes.NameIdentifier, user.Id)
+        //     };
 
-            var token = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpireMinutes"])),
-                signingCredentials: creds);
+        //     var token = new JwtSecurityToken(
+        //         issuer: jwtSettings["Issuer"],
+        //         audience: jwtSettings["Audience"],
+        //         claims: claims,
+        //         expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpireMinutes"])),
+        //         signingCredentials: creds);
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
+        //     return new JwtSecurityTokenHandler().WriteToken(token);
+        // }
     }
 }
