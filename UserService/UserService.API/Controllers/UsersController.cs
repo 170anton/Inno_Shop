@@ -24,7 +24,6 @@ namespace UserService.API.Controllers
             _productServiceClient = productServiceClient;
         }
         
-        // GET: api/users
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -32,7 +31,6 @@ namespace UserService.API.Controllers
             return Ok(users);
         }
         
-        // GET: api/users/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(string id)
         {
@@ -42,7 +40,6 @@ namespace UserService.API.Controllers
             return Ok(user);
         }
         
-        // PUT: api/users/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateUserModel model)
         {
@@ -74,7 +71,6 @@ namespace UserService.API.Controllers
         }
 
         
-        // DELETE: api/users/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
@@ -86,7 +82,6 @@ namespace UserService.API.Controllers
         }
 
 
-        // PUT: api/users/{id}/deactivate
         [HttpPut("{id}/deactivate")]
         public async Task<IActionResult> Deactivate(string id)
         {

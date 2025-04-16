@@ -19,7 +19,6 @@ namespace ProductService.API.Controllers
             _service = service;
         }
         
-        // GET: api/products
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -27,7 +26,6 @@ namespace ProductService.API.Controllers
             return Ok(products);
         }
         
-        // GET: api/products/{id}
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -37,7 +35,6 @@ namespace ProductService.API.Controllers
             return Ok(product);
         }
         
-        // POST: api/products
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Product product)
         {            
@@ -51,7 +48,6 @@ namespace ProductService.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
         }
         
-        // PUT: api/products/{id}
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] Product product)
         {
@@ -61,6 +57,9 @@ namespace ProductService.API.Controllers
             var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (currentUserId == null)
                 return Unauthorized();
+            var existingProduct = await _service.GetProductByIdAsync(id);
+            if (existingProduct == null)
+                return NotFound();
 
             if (product.CreatedByUserId.ToString() != currentUserId)
                 return Forbid("You are not allowed to modify this product.");
@@ -69,7 +68,6 @@ namespace ProductService.API.Controllers
             return NoContent();
         }
         
-        // DELETE: api/products/{id}
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -95,7 +93,6 @@ namespace ProductService.API.Controllers
             return NoContent();
         }
         
-        // PUT: api/products/activate/{userId}
         [HttpPut("activate/{userId}")]
         public async Task<IActionResult> ActivateProductsByUserId(Guid userId)
         {
@@ -103,7 +100,6 @@ namespace ProductService.API.Controllers
             return NoContent();
         }
 
-        // GET: api/products/search
         [HttpGet("search")]
         public async Task<IActionResult> SearchProducts([FromQuery] ProductSearchCriteria criteria)
         {

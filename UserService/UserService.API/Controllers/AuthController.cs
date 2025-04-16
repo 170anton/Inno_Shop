@@ -38,7 +38,6 @@ namespace UserService.API.Controllers
             _tokenService = tokenService;
         }
 
-        // POST: api/auth/register
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
@@ -69,7 +68,6 @@ namespace UserService.API.Controllers
             return Ok("Registration successful. Please check your email to confirm your account.");
         }
 
-        // POST: api/auth/login
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
@@ -88,7 +86,6 @@ namespace UserService.API.Controllers
             return Ok(new { token });
         }
 
-        // GET: api/auth/confirmemail?userId=...&token=...
         [HttpGet("confirmemail")]
         public async Task<IActionResult> ConfirmEmail(string userId, string token)
         {
@@ -108,7 +105,6 @@ namespace UserService.API.Controllers
         }
 
 
-        // POST: api/auth/forgotpassword
         [HttpPost("forgotpassword")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordModel model)
         {
@@ -133,7 +129,6 @@ namespace UserService.API.Controllers
             return Ok("If an account with that email exists, a password reset link has been sent.");
         }
 
-        // POST: api/auth/resetpassword
         [HttpPost("resetpassword")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordModel model)
         {
@@ -154,28 +149,5 @@ namespace UserService.API.Controllers
             else
                 return BadRequest(result.Errors);
         }
-
-        // private string GenerateJwtToken(User user)
-        // {
-        //     var jwtSettings = _configuration.GetSection("Jwt");
-        //     var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
-        //     var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        //     var claims = new[]
-        //     {
-        //         new Claim(JwtRegisteredClaimNames.Sub, user.Email),
-        //         new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-        //         new Claim(ClaimTypes.NameIdentifier, user.Id)
-        //     };
-
-        //     var token = new JwtSecurityToken(
-        //         issuer: jwtSettings["Issuer"],
-        //         audience: jwtSettings["Audience"],
-        //         claims: claims,
-        //         expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["ExpireMinutes"])),
-        //         signingCredentials: creds);
-
-        //     return new JwtSecurityTokenHandler().WriteToken(token);
-        // }
     }
 }

@@ -1,16 +1,15 @@
 using System;
 using System.IO;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using UserService.API.Middleware;
 using Xunit;
+using ProductService.API.Middleware;
 
-namespace UserService.Tests.Middleware
+namespace ProductService.Tests.Middleware
 {
     public class GlobalExceptionMiddlewareTests
     {
