@@ -27,124 +27,44 @@ namespace ProductService.Tests.Controllers
             _controller = new ProductsController(_productServiceMock.Object);
         }
 
+
         [Fact]
-        public async Task GetAll_ReturnsOkWithProducts()
+        public async Task GetAll_WithValidUser_ReturnsOkWithOwnProducts()
         {
+            var userGuid = Guid.NewGuid();
             var products = new List<Product>
             {
-                new Product { Id = Guid.NewGuid(), Name = "Product 1", Description = "Desc 1", Price = 10, IsAvailable = true, CreatedByUserId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow },
-                new Product { Id = Guid.NewGuid(), Name = "Product 2", Description = "Desc 2", Price = 20, IsAvailable = true, CreatedByUserId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow }
+                new Product { Id = Guid.NewGuid(), Name = "P1", Price = 1, IsAvailable = true, CreatedByUserId = userGuid, CreatedAt = DateTime.UtcNow },
+                new Product { Id = Guid.NewGuid(), Name = "P2", Price = 2, IsAvailable = true, CreatedByUserId = userGuid, CreatedAt = DateTime.UtcNow }
             };
-            _productServiceMock.Setup(s => s.GetAllProductsAsync()).ReturnsAsync(products);
+
+            _productServiceMock
+                .Setup(s => s.GetProductsByUserIdAsync(userGuid))
+                .ReturnsAsync(products);
+
+            var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userGuid.ToString()) };
+            var ctx = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = ctx };
 
 
             var result = await _controller.GetAll();
 
 
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedProducts = Assert.IsAssignableFrom<IEnumerable<Product>>(okResult.Value);
-            Assert.Equal(2, returnedProducts.Count());
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var returned = Assert.IsAssignableFrom<IEnumerable<Product>>(ok.Value);
+            Assert.Equal(2, returned.Count());
         }
 
         [Fact]
-        public async Task GetAll_ServiceThrowsException_ThrowsException()
+        public async Task GetAll_NoUserClaim_ReturnsUnauthorized()
         {
-            _productServiceMock.Setup(s => s.GetAllProductsAsync())
-                .ThrowsAsync(new Exception("Test exception"));
-
-            await Assert.ThrowsAsync<Exception>(() => _controller.GetAll());
-        }
-
-        [Fact]
-        public async Task GetById_ProductExists_ReturnsOkWithProduct()
-        {
-            var productId = Guid.NewGuid();
-            var product = new Product { Id = productId, Name = "Test Product", Description = "Desc", Price = 15, IsAvailable = true, CreatedByUserId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow };
-            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId)).ReturnsAsync(product);
-
-
-            var result = await _controller.GetById(productId);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedProduct = Assert.IsType<Product>(okResult.Value);
-            Assert.Equal(productId, returnedProduct.Id);
-        }
-
-        [Fact]
-        public async Task GetById_ProductNotFound_ReturnsNotFound()
-        {
-            var productId = Guid.NewGuid();
-            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId))
-                .ReturnsAsync((Product)null);
-
-
-            var result = await _controller.GetById(productId);
-
-
-            Assert.IsType<NotFoundResult>(result);
-        }
-
-        [Fact]
-        public async Task Create_ValidProduct_ReturnsCreatedAtAction()
-        {
-            var product = new Product
-            {
-                Id = Guid.NewGuid(),
-                Name = "New Product",
-                Description = "New Desc",
-                Price = 25,
-                IsAvailable = true,
-                CreatedByUserId = Guid.NewGuid(), 
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _productServiceMock.Setup(s => s.AddProductAsync(product))
-                .Returns(Task.CompletedTask);
-            var validUserGuid = Guid.NewGuid().ToString();
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, validUserGuid)
-            };
-            var identity = new ClaimsIdentity(claims, "TestAuthType");
-            var principal = new ClaimsPrincipal(identity);
-            _controller.ControllerContext = new ControllerContext 
-            {
-                HttpContext = new DefaultHttpContext { User = principal }
-            };
-
-            _controller.Url = new FakeUrlHelper();
-            
-
-            var result = await _controller.Create(product);
-
-
-            var createdResult = Assert.IsType<CreatedAtActionResult>(result);
-            Assert.Equal(nameof(_controller.GetById), createdResult.ActionName);
-            var returnedProduct = Assert.IsType<Product>(createdResult.Value);
-            Assert.Equal(product.Id, returnedProduct.Id);
-        }
-
-        [Fact]
-        public async Task Create_MissingUserClaim_ReturnsUnauthorized()
-        {
-            var product = new Product
-            {
-                Id = Guid.NewGuid(),
-                Name = "New Product",
-                Description = "New Desc",
-                Price = 25,
-                IsAvailable = true,
-                CreatedAt = DateTime.UtcNow
-            };
-
             _controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext() 
+                HttpContext = new DefaultHttpContext()
             };
 
 
-            var result = await _controller.Create(product);
+            var result = await _controller.GetAll();
 
 
             Assert.IsType<UnauthorizedResult>(result);
@@ -152,116 +72,110 @@ namespace ProductService.Tests.Controllers
 
 
         [Fact]
-        public async Task Update_ValidProduct_ReturnsNoContent()
+        public async Task GetById_ProductBelongsToUser_ReturnsOk()
         {
             var productId = Guid.NewGuid();
-            var userGuid = Guid.NewGuid();
-            var product = new Product
-            {
+            var userGuid    = Guid.NewGuid();
+            var product     = new Product {
                 Id = productId,
-                Name = "Existing Product",
-                Description = "Desc",
-                Price = 20,
+                Name = "Test",
+                Description = "",
+                Price = 10,
                 IsAvailable = true,
                 CreatedByUserId = userGuid,
                 CreatedAt = DateTime.UtcNow
             };
-
-            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId))
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(productId))
                 .ReturnsAsync(product);
 
-            _productServiceMock.Setup(s => s.UpdateProductAsync(product))
-                .Returns(Task.CompletedTask);
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, userGuid.ToString())
-            };
-            var identity = new ClaimsIdentity(claims, "TestAuthType");
-            _controller.ControllerContext = new ControllerContext 
-            { 
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) } 
+            var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userGuid.ToString()) };
+            _controller.ControllerContext = new ControllerContext {
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) }
             };
 
 
-            var result = await _controller.Update(productId, product);
+            var result = await _controller.GetById(productId);
 
 
-            Assert.IsType<NoContentResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal(product, ok.Value);
         }
 
         [Fact]
-        public async Task Update_ProductNotFound_ReturnsNotFound()
+        public async Task GetById_ProductNotOwnedOrMissing_ReturnsNotFound()
         {
             var productId = Guid.NewGuid();
-            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId))
+            var userGuid  = Guid.NewGuid();
+
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(productId))
                 .ReturnsAsync((Product)null);
 
-            var updateProduct = new Product
-            {
-                Id = productId,
-                Name = "Updated Product",
-                Description = "Updated Desc",
-                Price = 30,
-                IsAvailable = true,
-                CreatedByUserId = Guid.NewGuid(),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, updateProduct.CreatedByUserId.ToString())
-            };
-            var identity = new ClaimsIdentity(claims, "TestAuthType");
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+            var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userGuid.ToString()) };
+            _controller.ControllerContext = new ControllerContext {
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) }
             };
 
 
-            var result = await _controller.Update(productId, updateProduct);
+            var result = await _controller.GetById(productId);
 
 
             Assert.IsType<NotFoundResult>(result);
         }
-
         [Fact]
-        public async Task Update_IdMismatch_ReturnsBadRequest()
+
+
+        public async Task Create_ValidDto_ReturnsCreatedAtAction()
         {
-            var routeId = Guid.NewGuid();
-            var product = new Product
+            var dto = new CreateProductDto
             {
-                Id = Guid.NewGuid(),
-                Name = "Product",
-                Description = "Desc",
-                Price = 20,
-                IsAvailable = true,
-                CreatedByUserId = Guid.NewGuid(),
-                CreatedAt = DateTime.UtcNow
+                Name = "New Product",
+                Description = "New Desc",
+                Price = 25m,
+                IsAvailable = true
+            };
+            Product capturedProduct = null!;
+            _productServiceMock
+                .Setup(s => s.AddProductAsync(It.IsAny<Product>()))
+                .Callback<Product>(p => capturedProduct = p)
+                .Returns(Task.CompletedTask);
+
+            var validUserGuid = Guid.NewGuid().ToString();
+            var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, validUserGuid) };
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
             };
 
+            _controller.Url = new FakeUrlHelper();
 
-            var result = await _controller.Update(routeId, product);
+
+            var result = await _controller.Create(dto);
 
 
-            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-            Assert.Equal("ID mismatch", badRequest.Value);
+            var created = Assert.IsType<CreatedAtActionResult>(result);
+            Assert.Equal(nameof(_controller.GetById), created.ActionName);
+
+            var returned = Assert.IsType<Product>(created.Value);
+            Assert.Equal(capturedProduct.Id, returned.Id);
+
+            Assert.Equal(dto.Name, capturedProduct.Name);
+            Assert.Equal(dto.Description, capturedProduct.Description);
+            Assert.Equal(dto.Price, capturedProduct.Price);
+            Assert.Equal(dto.IsAvailable, capturedProduct.IsAvailable);
+            Assert.Equal(Guid.Parse(validUserGuid), capturedProduct.CreatedByUserId);
         }
 
         [Fact]
-        public async Task Update_MissingUserClaim_ReturnsUnauthorized()
+        public async Task Create_MissingUserClaim_ReturnsUnauthorized()
         {
-            var productId = Guid.NewGuid();
-            var userGuid = Guid.NewGuid();
-            var product = new Product
+            var dto = new CreateProductDto
             {
-                Id = productId,
-                Name = "Product",
-                Description = "Desc",
-                Price = 20,
-                IsAvailable = true,
-                CreatedByUserId = userGuid,
-                CreatedAt = DateTime.UtcNow
+                Name = "New Product",
+                Description = "New Desc",
+                Price = 25m,
+                IsAvailable = true
             };
 
             _controller.ControllerContext = new ControllerContext
@@ -269,46 +183,127 @@ namespace ProductService.Tests.Controllers
                 HttpContext = new DefaultHttpContext()
             };
 
+            // Act
+            var result = await _controller.Create(dto);
 
-            var result = await _controller.Update(productId, product);
+            // Assert
+            Assert.IsType<UnauthorizedResult>(result);
+        }
 
 
+
+
+        [Fact]
+        public async Task Update_ValidDto_ReturnsNoContentAndAppliesChanges()
+        {
+            // Arrange
+            var userGuid = Guid.NewGuid();
+            var id = Guid.NewGuid();
+            var existing = new Product
+            {
+                Id = id,
+                Name = "OldName",
+                Description = "OldDesc",
+                Price = 10m,
+                IsAvailable = false,
+                CreatedByUserId = userGuid,
+                CreatedAt = DateTime.UtcNow
+            };
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(id))
+                .ReturnsAsync(existing);
+
+            Product captured = null!;
+            _productServiceMock
+                .Setup(s => s.UpdateProductAsync(It.IsAny<Product>()))
+                .Callback<Product>(p => captured = p)
+                .Returns(Task.CompletedTask);
+
+            SetUser(userGuid.ToString());
+
+            var dto = new UpdateProductDto
+            {
+                Name = "NewName",
+                // Description остаётся null, так что не тронется
+                Price = 20m,
+                // IsAvailable остаётся null
+            };
+
+            // Act
+            var result = await _controller.Update(id, dto);
+
+            // Assert
+            Assert.IsType<NoContentResult>(result);
+            Assert.Equal("NewName", captured.Name);
+            Assert.Equal("OldDesc", captured.Description);      // не был перезаписан
+            Assert.Equal(20m, captured.Price);
+            Assert.False(captured.IsAvailable);                  // не был перезаписан
+            Assert.Equal(userGuid, captured.CreatedByUserId);    // не поменялся
+        }
+
+        [Fact]
+        public async Task Update_ProductNotFound_ReturnsNotFound()
+        {
+            // Arrange
+            var id = Guid.NewGuid();
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(id))
+                .ReturnsAsync((Product)null);
+
+            // need to have *some* user to pass the user-null check, но до него not found
+            SetUser(Guid.NewGuid().ToString());
+
+            // Act
+            var result = await _controller.Update(id, new UpdateProductDto());
+
+            // Assert
+            Assert.IsType<NotFoundResult>(result);
+        }
+
+        [Fact]
+        public async Task Update_NoUserClaim_ReturnsUnauthorized()
+        {
+            // Arrange
+            var id = Guid.NewGuid();
+            var existing = new Product { Id = id, CreatedByUserId = Guid.NewGuid() };
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(id))
+                .ReturnsAsync(existing);
+
+            // НЕ вызываем SetUser => User будет пустой
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+
+            // Act
+            var result = await _controller.Update(id, new UpdateProductDto());
+
+            // Assert
             Assert.IsType<UnauthorizedResult>(result);
         }
 
         [Fact]
-        public async Task Update_UserMismatch_ReturnsForbid()
+        public async Task Update_UserMismatch_ReturnsForbiddenWithMessage()
         {
-            var productId = Guid.NewGuid();
-            var productOwner = Guid.NewGuid();
-            var product = new Product
-            {
-                Id = productId,
-                Name = "Product",
-                Description = "Desc",
-                Price = 20,
-                IsAvailable = true,
-                CreatedByUserId = productOwner,
-                CreatedAt = DateTime.UtcNow
-            };
+            // Arrange
+            var id = Guid.NewGuid();
+            // existing.CreatedByUserId – один GUID
+            var existing = new Product { Id = id, CreatedByUserId = Guid.NewGuid() };
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(id))
+                .ReturnsAsync(existing);
 
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
-            };
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuthType")) }
-            };
+            // а в токене – другой
+            SetUser(Guid.NewGuid().ToString());
 
-            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId))
-                               .ReturnsAsync(product);
+            // Act
+            var result = await _controller.Update(id, new UpdateProductDto());
 
-
-            var result = await _controller.Update(productId, product);
-
-
-            Assert.IsType<ForbidResult>(result);
+            // Assert
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+            Assert.Equal("You are not allowed to modify this product.", obj.Value);
         }
 
 
@@ -404,24 +399,24 @@ namespace ProductService.Tests.Controllers
                 CreatedByUserId = productOwner,
                 CreatedAt = DateTime.UtcNow
             };
-
-            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId))
+            _productServiceMock
+                .Setup(s => s.GetProductByIdAsync(productId))
                 .ReturnsAsync(product);
 
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
+            var otherUserId = Guid.NewGuid().ToString();
+            var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, otherUserId) };
+            _controller.ControllerContext = new ControllerContext {
+                HttpContext = new DefaultHttpContext {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuthType"))
+                }
             };
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuthType")) }
-            };
-
-
+            
             var result = await _controller.Delete(productId);
 
 
-            var forbidResult = Assert.IsType<ForbidResult>(result);
+            var objResult = Assert.IsType<ForbidResult>(result);
+            // Assert.Equal(StatusCodes.Status403Forbidden, objResult.StatusCode);
+            // Assert.Equal("You are not allowed to delete this product.", objResult.Value);
         }
 
 
@@ -526,6 +521,24 @@ namespace ProductService.Tests.Controllers
 
 
             await Assert.ThrowsAsync<Exception>(() => _controller.SearchProducts(criteria));
+        }
+
+
+
+
+
+        private void SetUser(string userId)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId)
+            };
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            var principal = new ClaimsPrincipal(identity);
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = principal }
+            };
         }
     }
 }

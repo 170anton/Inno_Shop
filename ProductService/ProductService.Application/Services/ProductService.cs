@@ -24,6 +24,11 @@ namespace ProductService.Application.Services
             return await _repository.GetAllAsync();
         }
 
+        public async Task<IEnumerable<Product>> GetProductsByUserIdAsync(Guid userId)
+        {
+            return await _repository.GetProductsByUserIdAsync(userId);
+        }
+
         public async Task<Product?> GetProductByIdAsync(Guid id)
         {
             return await _repository.GetByIdAsync(id);

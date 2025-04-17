@@ -9,6 +9,7 @@ namespace ProductService.Application.Interfaces
     public interface IProductService
     {
         Task<IEnumerable<Product>> GetAllProductsAsync();
+        Task<IEnumerable<Product>> GetProductsByUserIdAsync(Guid userId);
         Task<Product?> GetProductByIdAsync(Guid id);
         Task AddProductAsync(Product product);
         Task UpdateProductAsync(Product product);
