@@ -353,5 +353,19 @@ namespace UserService.Tests.Controllers
             var errorString = string.Join(" ", errors.Select(e => e.Description));
             Assert.Contains("Update failed", errorString);
         }
+
+        [Fact]
+        public async Task Activate_UserNotFound_ReturnsNotFound()
+        {
+            var nonExistentUserId = "nonexistent-user-id";
+            _userServiceMock.Setup(s => s.GetByIdAsync(nonExistentUserId))
+                            .ReturnsAsync((User)null);
+            
+
+            var result = await _controller.Activate(nonExistentUserId);
+            
+            
+            Assert.IsType<NotFoundResult>(result);
+        }
     }
 }

@@ -187,6 +187,26 @@ namespace UserService.Tests.Controllers
         }
 
         [Fact]
+        public async Task Login_InvalidModel_ReturnsBadRequest()
+        {
+            var model = new LoginModel
+            {
+                Email = "invalid-email",
+                Password = "123"
+            };
+
+            _controller.ModelState.AddModelError("Email", "Email format is incorrect");
+
+
+            var result = await _controller.Login(model);
+
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+
+
+        [Fact]
         public async Task ConfirmEmail_ValidParameters_ReturnsOk()
         {
             string userId = "123";
@@ -244,21 +264,17 @@ namespace UserService.Tests.Controllers
             Assert.Equal("Error confirming your email.", badRequestResult.Value);
         }
 
-
         [Fact]
-        public async Task ForgotPassword_UserNotFound_ReturnsOkWithGenericMessage()
+        public async Task ConfirmEmail_MissingParameters_ReturnsBadRequest()
         {
-            var forgotModel = new ForgotPasswordModel { Email = "notfound@example.com" };
-            _userManagerMock.Setup(um => um.FindByEmailAsync(forgotModel.Email))
-                .ReturnsAsync((User)null);
+            var result = await _controller.ConfirmEmail("", "");
 
 
-            var result = await _controller.ForgotPassword(forgotModel);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Contains("If an account with that email exists", okResult.Value.ToString());
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Equal("User Id and token are required.", badRequestResult.Value);
         }
+
+
 
         [Fact]
         public async Task ForgotPassword_UserFound_SendsEmailAndReturnsOk()
@@ -279,6 +295,38 @@ namespace UserService.Tests.Controllers
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Contains("If an account with that email exists", okResult.Value.ToString());
         }
+
+        [Fact]
+        public async Task ForgotPassword_UserNotFound_ReturnsOkWithGenericMessage()
+        {
+            var forgotModel = new ForgotPasswordModel { Email = "notfound@example.com" };
+            _userManagerMock.Setup(um => um.FindByEmailAsync(forgotModel.Email))
+                .ReturnsAsync((User)null);
+
+
+            var result = await _controller.ForgotPassword(forgotModel);
+
+
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            Assert.Contains("If an account with that email exists", okResult.Value.ToString());
+        }
+
+        [Fact]
+        public async Task ForgotPassword_InvalidModel_ReturnsBadRequest()
+        {
+            var model = new ForgotPasswordModel
+            {
+                Email = ""
+            };
+            _controller.ModelState.AddModelError("Email", "Email is required");
+
+
+            var result = await _controller.ForgotPassword(model);
+
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
 
         [Fact]
         public async Task ResetPassword_ValidModel_ReturnsOk()
@@ -369,6 +417,25 @@ namespace UserService.Tests.Controllers
             var errors = badRequestResult.Value as IEnumerable<IdentityError>;
             var errorString = string.Join(" ", errors.Select(e => e.Description));
             Assert.Contains("Invalid token", errorString);
+        }
+
+        [Fact]
+        public async Task ResetPassword_InvalidModel_ReturnsBadRequest()
+        {
+            var model = new ResetPasswordModel
+            {
+                UserId = "123",
+                Token = "",
+                NewPassword = "NewPassword123",
+                ConfirmPassword = "NewPassword123"
+            };
+            _controller.ModelState.AddModelError("Token", "Token is required");
+
+
+            var result = await _controller.ResetPassword(model);
+
+
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
 

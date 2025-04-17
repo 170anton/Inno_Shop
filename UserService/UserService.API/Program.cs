@@ -19,11 +19,28 @@ using UserService.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<UserDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+var env = builder.Environment;
+
+if (env.IsEnvironment("IntegrationTests"))
+{
+    builder.Services.AddDbContext<UserDbContext>(opts =>
+        opts.UseInMemoryDatabase("InMemoryTestDb"));
+}
+else
+{
+    builder.Services.AddDbContext<UserDbContext>(opts =>
+        opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+}
 
 builder.Services.AddDefaultIdentity<User>(options => {
-    options.SignIn.RequireConfirmedAccount = true;
+    if (builder.Environment.IsEnvironment("IntegrationTests"))
+    {
+        options.SignIn.RequireConfirmedAccount = false;
+    }
+    else
+    {
+        options.SignIn.RequireConfirmedAccount = true;
+    }
     
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 1;
@@ -120,8 +137,16 @@ app.UseMiddleware<UserService.API.Middleware.GlobalExceptionMiddleware>();
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<UserDbContext>();
-    dbContext.Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+
+    if (env.IsEnvironment("IntegrationTests"))
+    {
+        db.Database.EnsureCreated();
+    }
+    else
+    {
+        db.Database.Migrate();
+    }
 }
 
 if (app.Environment.IsDevelopment())

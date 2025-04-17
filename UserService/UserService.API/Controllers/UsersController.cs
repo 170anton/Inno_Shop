@@ -105,7 +105,6 @@ namespace UserService.API.Controllers
             return Ok("User deactivated.");
         }
 
-        // PUT: api/users/{id}/activate
         [HttpPut("{id}/activate")]
         public async Task<IActionResult> Activate(string id)
         {

@@ -11,6 +11,7 @@ using ProductService.Application.Interfaces;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using ProductService.Tests.Helpers;
+using ProductService.Application.DTOs;
 
 namespace ProductService.Tests.Controllers
 {
@@ -224,12 +225,96 @@ namespace ProductService.Tests.Controllers
             Assert.IsType<NotFoundResult>(result);
         }
 
+        [Fact]
+        public async Task Update_IdMismatch_ReturnsBadRequest()
+        {
+            var routeId = Guid.NewGuid();
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Product",
+                Description = "Desc",
+                Price = 20,
+                IsAvailable = true,
+                CreatedByUserId = Guid.NewGuid(),
+                CreatedAt = DateTime.UtcNow
+            };
+
+
+            var result = await _controller.Update(routeId, product);
+
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Equal("ID mismatch", badRequest.Value);
+        }
+
+        [Fact]
+        public async Task Update_MissingUserClaim_ReturnsUnauthorized()
+        {
+            var productId = Guid.NewGuid();
+            var userGuid = Guid.NewGuid();
+            var product = new Product
+            {
+                Id = productId,
+                Name = "Product",
+                Description = "Desc",
+                Price = 20,
+                IsAvailable = true,
+                CreatedByUserId = userGuid,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+
+
+            var result = await _controller.Update(productId, product);
+
+
+            Assert.IsType<UnauthorizedResult>(result);
+        }
+
+        [Fact]
+        public async Task Update_UserMismatch_ReturnsForbid()
+        {
+            var productId = Guid.NewGuid();
+            var productOwner = Guid.NewGuid();
+            var product = new Product
+            {
+                Id = productId,
+                Name = "Product",
+                Description = "Desc",
+                Price = 20,
+                IsAvailable = true,
+                CreatedByUserId = productOwner,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
+            };
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuthType")) }
+            };
+
+            _productServiceMock.Setup(s => s.GetProductByIdAsync(productId))
+                               .ReturnsAsync(product);
+
+
+            var result = await _controller.Update(productId, product);
+
+
+            Assert.IsType<ForbidResult>(result);
+        }
 
 
         [Fact]
         public async Task Delete_ValidIdAndMatchingUser_ReturnsNoContent()
         {
-            // Arrange
             var productId = Guid.NewGuid();
             var userGuid = Guid.NewGuid();
             var product = new Product
@@ -272,7 +357,7 @@ namespace ProductService.Tests.Controllers
             var productId = Guid.NewGuid();
             _controller.ControllerContext = new ControllerContext 
             { 
-                HttpContext = new DefaultHttpContext() // User = null
+                HttpContext = new DefaultHttpContext()
             };
 
 
@@ -389,6 +474,58 @@ namespace ProductService.Tests.Controllers
 
 
             await Assert.ThrowsAsync<Exception>(() => _controller.ActivateProductsByUserId(userId));
+        }
+
+        [Fact]
+        public async Task SearchProducts_ValidCriteria_ReturnsOkWithProducts()
+        {
+            var criteria = new ProductSearchCriteria
+            {
+                Name = "Test",
+                MinPrice = 10,
+                MaxPrice = 100,
+                IsAvailable = null
+            };
+
+            var products = new List<Product>
+            {
+                new Product 
+                {
+                    Id = Guid.NewGuid(), 
+                    Name = "Test Product", 
+                    Description = "Test Desc", 
+                    Price = 50, 
+                    IsAvailable = true, 
+                    CreatedByUserId = Guid.NewGuid(), 
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+
+            _productServiceMock.Setup(s => s.SearchProductsAsync(criteria))
+                               .ReturnsAsync(products);
+
+
+            var result = await _controller.SearchProducts(criteria);
+
+
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var returnedProducts = Assert.IsAssignableFrom<IEnumerable<Product>>(okResult.Value);
+            Assert.Single(returnedProducts);
+        }
+
+        [Fact]
+        public async Task SearchProducts_ServiceThrowsException_ThrowsException()
+        {
+            var criteria = new ProductSearchCriteria
+            {
+                Name = "Test"
+            };
+
+            _productServiceMock.Setup(s => s.SearchProductsAsync(criteria))
+                               .ThrowsAsync(new Exception("Service error"));
+
+
+            await Assert.ThrowsAsync<Exception>(() => _controller.SearchProducts(criteria));
         }
     }
 }
