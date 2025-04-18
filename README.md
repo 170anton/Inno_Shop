@@ -40,9 +40,8 @@ It consists of two separate services:
    ```
 
 2. **Environment variables**  
-   Create a `.env` file in the root with:
 
-   ```env
+   ```
    # UserService
    ASPNETCORE_ENVIRONMENT=Development
    ConnectionStrings__Default=Host=user-db;Port=5432;Database=UserServiceDb;Username=user;Password=userpassword
