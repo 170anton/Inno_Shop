@@ -1,6 +1,6 @@
 # Inno Shop
 
-A simple example of a microservices-based application built with ASP.NET Core.  
+A simple microservices-based application built with ASP.NET Core.  
 It consists of two separate services:
 
 - **UserService** – user management (registration, login, email confirmation, password reset, profile).
@@ -84,7 +84,7 @@ It consists of two separate services:
   cd ProductService/ProductService.IntegrationTests && dotnet test
   ```
 
-> Integration tests use an in-memory database by setting `ASPNETCORE_ENVIRONMENT=IntegrationTests`.
+ Integration tests use an in-memory database by setting `ASPNETCORE_ENVIRONMENT=IntegrationTests`.
 
 ---
 
@@ -93,7 +93,7 @@ It consists of two separate services:
 ### UserService
 
 - `POST /api/auth/register` – user sign-up  
-- `POST /api/auth/login` – user login → returns JWT  
+- `POST /api/auth/login` – user login
 - `GET /api/auth/confirmemail` – email confirmation  
 - `POST /api/auth/forgotpassword` – request password reset  
 - `POST /api/auth/resetpassword` – reset password 
