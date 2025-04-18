@@ -62,14 +62,6 @@ namespace ProductService.IntegrationTests
             Assert.Equal("A", list![0].Name);
         }
 
-        // [Fact]
-        // public async Task GetAll_WithoutAuthHeader_ReturnsUnauthorized()
-        // {
-        //     var client = _factory.CreateClient(); 
-        //     var resp   = await client.GetAsync("/api/products");
-        //     Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
-        // }
-
         [Fact]
         public async Task GetById_OwnedProduct_ReturnsOk()
         {
@@ -112,16 +104,6 @@ namespace ProductService.IntegrationTests
             var created = await resp.Content.ReadFromJsonAsync<Product>();
             Assert.Equal("New", created!.Name);
         }
-
-        // [Fact]
-        // public async Task Create_WithoutAuthHeader_ReturnsUnauthorized()
-        // {
-        //     var client = _factory.CreateClient();
-        //     var dto    = new CreateProductDto { Name = "No", Description = "No", Price = 0, IsAvailable = true };
-
-        //     var resp = await client.PostAsJsonAsync("/api/products", dto);
-        //     Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
-        // }
 
         [Fact]
         public async Task Update_Existing_ReturnsNoContent()
@@ -214,14 +196,6 @@ namespace ProductService.IntegrationTests
             Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
         }
 
-        // [Fact]
-        // public async Task ActivateProductsByUserId_NoAuth_ReturnsUnauthorized()
-        // {
-        //     var client = _factory.CreateClient();
-        //     var resp   = await client.PutAsync($"/api/products/activate/{_testUserId}", null);
-        //     Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
-        // }
-
         [Fact]
         public async Task SearchProducts_ValidCriteria_ReturnsOk()
         {
@@ -241,13 +215,5 @@ namespace ProductService.IntegrationTests
             Assert.Single(list);
             Assert.Equal("bar", list![0].Name);
         }
-
-        // [Fact]
-        // public async Task SearchProducts_NoAuth_ReturnsUnauthorized()
-        // {
-        //     var client = _factory.CreateClient();
-        //     var resp   = await client.GetAsync("/api/products/search?name=anything");
-        //     Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
-        // }
     }
 }
