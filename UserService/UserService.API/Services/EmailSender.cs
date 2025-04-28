@@ -18,11 +18,9 @@ namespace UserService.API.Services
             var bodyBuilder = new BodyBuilder { HtmlBody = htmlMessage };
             message.Body = bodyBuilder.ToMessageBody();
 
-            // Connect to MailHog SMTP server on localhost:1025
             using (var client = new SmtpClient())
             {
                 await client.ConnectAsync("mailhog", 1025, SecureSocketOptions.None);
-                // MailHog does not require authentication
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
             }

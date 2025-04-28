@@ -12,6 +12,8 @@ using UserService.API.Controllers;
 using UserService.Application.DTOs; 
 using UserService.Domain.Entities; 
 using UserService.Application.Interfaces;
+using MediatR;
+using UserService.Application.Commands;
 
 namespace UserService.Tests.Controllers
 {
@@ -19,14 +21,16 @@ namespace UserService.Tests.Controllers
     {
         private readonly Mock<IUserService> _userServiceMock;
         private readonly Mock<IProductServiceClient> _productServiceClientMock;
+        private readonly Mock<IMediator> _mediatorMock;
         private readonly UsersController _controller;
         
         public UsersControllerTests()
         {
             _userServiceMock = new Mock<IUserService>();
             _productServiceClientMock = new Mock<IProductServiceClient>();
+            _mediatorMock = new Mock<IMediator>();
             
-            _controller = new UsersController(_userServiceMock.Object, _productServiceClientMock.Object);
+            _controller = new UsersController(_userServiceMock.Object, _productServiceClientMock.Object, _mediatorMock.Object);
             
             var httpContext = new DefaultHttpContext();
             
@@ -34,34 +38,6 @@ namespace UserService.Tests.Controllers
             _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         }
 
-
-        [Fact]
-        public async Task GetAll_ReturnsOkWithUsers()
-        {
-            var users = new List<User>
-            {
-                new User { Id = "1", Email = "user1@example.com", UserName = "user1@example.com", Name = "User One" },
-                new User { Id = "2", Email = "user2@example.com", UserName = "user2@example.com", Name = "User Two" }
-            };
-            _userServiceMock.Setup(s => s.GetAllAsync()).ReturnsAsync(users);
-            
-
-            var result = await _controller.GetAll();
-            
-            
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            var returnedUsers = Assert.IsAssignableFrom<IEnumerable<User>>(okResult.Value);
-            Assert.Equal(2, returnedUsers.Count());
-        }
-
-        [Fact]
-        public async Task GetAll_ServiceThrowsException_ThrowsException()
-        {
-            _userServiceMock.Setup(s => s.GetAllAsync())
-                .ThrowsAsync(new Exception("Test exception"));
-
-            await Assert.ThrowsAsync<Exception>(() => _controller.GetAll());
-        }
 
 
         [Fact]
@@ -95,88 +71,88 @@ namespace UserService.Tests.Controllers
 
 
         [Fact]
-        public async Task Update_UserExists_ReturnsOkWithUpdatedUser()
+        public async Task Update_UserExists_CallsMediatorAndReturnsOk()
         {
-            var existingUser = new User 
-            { 
-                Id = "1", Email = "old@example.com", UserName = "old@example.com", Name = "Old Name", Address = "Old Address" 
-            };
-
-            var updateModel = new UpdateUserModel
+            var userId = "1";
+            var model = new UpdateUserModel
             {
                 Email = "new@example.com",
                 Name = "New Name",
                 Address = "New Address"
             };
+            var updatedUser = new User
+            {
+                Id = userId,
+                Email = model.Email,
+                UserName = model.Email,
+                Name = model.Name,
+                Address = model.Address
+            };
 
-            _userServiceMock.Setup(s => s.GetByIdAsync("1")).ReturnsAsync(existingUser);
+            _mediatorMock
+                .Setup(m => m.Send(
+                    It.Is<UpdateUserCommand>(cmd =>
+                        cmd.UserId == userId &&
+                        cmd.Email == model.Email &&
+                        cmd.Name == model.Name &&
+                        cmd.Address == model.Address
+                    ),
+                    It.IsAny<CancellationToken>()
+                ))
+                .ReturnsAsync(updatedUser);
 
-            _userServiceMock.Setup(s => s.UpdateUserAsync(It.IsAny<User>()))
-                .ReturnsAsync(IdentityResult.Success);
+
+            var actionResult = await _controller.Update(userId, model);
 
 
-            var result = await _controller.Update("1", updateModel);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            var updatedUser = Assert.IsType<User>(okResult.Value);
-            Assert.Equal("new@example.com", updatedUser.Email);
-            Assert.Equal("New Name", updatedUser.Name);
-            Assert.Equal("New Address", updatedUser.Address);
+            var okResult = Assert.IsType<OkObjectResult>(actionResult);
+            Assert.Equal(updatedUser, okResult.Value);
+            _mediatorMock.Verify(m => m.Send(It.IsAny<UpdateUserCommand>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
         public async Task Update_UserDoesNotExist_ReturnsNotFound()
         {
-            var updateModel = new UpdateUserModel
+            var userId = "nonexistent";
+            var model = new UpdateUserModel
             {
                 Email = "new@example.com",
                 Name = "New Name",
                 Address = "New Address"
             };
 
-            _userServiceMock.Setup(s => s.GetByIdAsync("nonexistent"))
-                .ReturnsAsync((User)null);
+            _mediatorMock
+                .Setup(m => m.Send(It.IsAny<UpdateUserCommand>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new KeyNotFoundException());
 
 
-            var result = await _controller.Update("nonexistent", updateModel);
+            var result = await _controller.Update(userId, model);
 
 
             Assert.IsType<NotFoundResult>(result);
         }
 
         [Fact]
-        public async Task Update_UpdateFails_ReturnsBadRequest()
+        public async Task Update_HandlerFails_ReturnsBadRequest()
         {
-            var existingUser = new User 
-            { 
-                Id = "1", Email = "old@example.com", UserName = "old@example.com", Name = "Old Name", Address = "Old Address" 
-            };
-
-            var updateModel = new UpdateUserModel
+            var userId = "1";
+            var model = new UpdateUserModel
             {
                 Email = "new@example.com",
                 Name = "New Name",
                 Address = "New Address"
             };
 
-            _userServiceMock.Setup(s => s.GetByIdAsync("1")).ReturnsAsync(existingUser);
-            
-            var identityError = new IdentityError { Description = "Update failed" };
-            _userServiceMock.Setup(s => s.UpdateUserAsync(existingUser))
-                .ReturnsAsync(IdentityResult.Failed(identityError));
+            _mediatorMock
+                .Setup(m => m.Send(It.IsAny<UpdateUserCommand>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new ApplicationException("Some validation error"));
 
 
-            var result = await _controller.Update("1", updateModel);
+            var result = await _controller.Update(userId, model);
 
 
-            // var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            // Assert.Contains("Update failed", badRequestResult.Value.ToString());
-
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            var errors = badRequestResult.Value as IEnumerable<IdentityError>;
-            var errorString = string.Join(" ", errors.Select(e => e.Description));
-            Assert.Contains("Update failed", errorString);
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Equal("Some validation error", badRequest.Value);
         }
 
 

@@ -3,11 +3,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using UserService.Application.Commands;
 using UserService.Application.DTOs;
 using UserService.Application.Interfaces;
 using UserService.Domain.Entities;
@@ -23,19 +25,22 @@ namespace UserService.API.Controllers
         private readonly IEmailSender _emailSender;
         private readonly IConfiguration _configuration;
         private readonly ITokenService _tokenService;
+        private readonly IMediator _mediator;
 
         public AuthController(
             UserManager<User> userManager,
             SignInManager<User> signInManager,
             IEmailSender emailSender,
             IConfiguration configuration,
-            ITokenService tokenService)
+            ITokenService tokenService,
+            IMediator mediator)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _emailSender = emailSender;
             _configuration = configuration;
             _tokenService = tokenService;
+            _mediator = mediator;
         }
 
         [HttpPost("register")]
@@ -44,28 +49,17 @@ namespace UserService.API.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = new User
+            var command = new RegisterUserCommand
             {
-                UserName = model.Email,
                 Email = model.Email,
-                Name = model.Name, 
-                Address = model.Address ?? string.Empty
+                Password = model.Password,
+                Name = model.Name,
+                Address = model.Address
             };
 
-            var result = await _userManager.CreateAsync(user, model.Password);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
+            var message = await _mediator.Send(command);
 
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var encodedToken = System.Net.WebUtility.UrlEncode(token);
-
-            var clientUrl = _configuration["AppSettings:ClientUrl"] ?? "http://localhost:4200";
-            var confirmationUrl = $"{clientUrl}/confirmemail?userId={user.Id}&token={encodedToken}";
-
-            await _emailSender.SendEmailAsync(user.Email, "Confirm your email",
-                $"Please confirm your account by clicking this link: <a href='{confirmationUrl}'>Confirm Email</a>");
-
-            return Ok("Registration successful. Please check your email to confirm your account.");
+            return Ok(message);
         }
 
         [HttpPost("login")]
@@ -104,27 +98,13 @@ namespace UserService.API.Controllers
                 return BadRequest("Error confirming your email.");
         }
 
-
         [HttpPost("forgotpassword")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordModel model)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user == null)
-            {
-                return Ok("If an account with that email exists, a password reset link has been sent.");
-            }
-
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var encodedToken = System.Net.WebUtility.UrlEncode(token);
-
-            var clientUrl = _configuration["AppSettings:ClientUrl"] ?? "http://localhost:4200";
-            var resetUrl = $"{clientUrl}/resetpassword?userId={user.Id}&token={encodedToken}";
-
-            await _emailSender.SendEmailAsync(user.Email, "Reset your password",
-                $"Please reset your password by clicking here: <a href='{resetUrl}'>Reset Password</a>");
+            await _mediator.Send(new ForgotPasswordCommand { Email = model.Email });
 
             return Ok("If an account with that email exists, a password reset link has been sent.");
         }
@@ -138,16 +118,15 @@ namespace UserService.API.Controllers
             if (model.NewPassword != model.ConfirmPassword)
                 return BadRequest("Passwords do not match.");
 
-            var user = await _userManager.FindByIdAsync(model.UserId);
-            if (user == null)
-                return NotFound("User not found.");
+            await _mediator.Send(new ResetPasswordCommand
+            {
+                UserId = model.UserId,
+                Token = model.Token,
+                NewPassword = model.NewPassword,
+                ConfirmPassword = model.ConfirmPassword
+            });
 
-            string decodedToken = System.Net.WebUtility.UrlDecode(model.Token);
-            var result = await _userManager.ResetPasswordAsync(user, decodedToken, model.NewPassword);
-            if (result.Succeeded)
-                return Ok("Password has been reset successfully.");
-            else
-                return BadRequest(result.Errors);
+            return Ok("Password has been reset successfully.");
         }
     }
 }

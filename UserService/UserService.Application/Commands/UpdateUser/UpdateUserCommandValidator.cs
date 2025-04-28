@@ -1,11 +1,10 @@
 using FluentValidation;
-using UserService.Application.DTOs;
 
-namespace UserService.Application.Validators
+namespace UserService.Application.Commands
 {
-    public class UpdateUserModelValidator : AbstractValidator<UpdateUserModel>
+    public class UpdateUserCommandValidator : AbstractValidator<UpdateUserCommand>
     {
-        public UpdateUserModelValidator()
+        public UpdateUserCommandValidator()
         {
             RuleFor(x => x.Email)
                 .NotEmpty().WithMessage("Email cannot be empty.")
@@ -14,6 +13,7 @@ namespace UserService.Application.Validators
 
             RuleFor(x => x.Name)
                 .NotEmpty().WithMessage("Name cannot be empty.")
+                .MaximumLength(30).WithMessage("Name cannot exceed 30 characters.")
                 .When(x => x.Name != null);
 
             RuleFor(x => x.Address)

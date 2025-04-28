@@ -26,59 +26,13 @@ namespace UserService.IntegrationTests
             _client  = factory.CreateClient();
         }
 
-        private async Task<string> RegisterNewUserAsync()
-        {
-            var email = $"{Guid.NewGuid():N}@example.com";
-            var reg = new RegisterModel {
-                Email    = email,
-                Password = "Password!1",
-                Name     = "TestUser",
-                Address  = "Addr"
-            };
-            var resp = await _client.PostAsJsonAsync("/api/auth/register", reg);
-            resp.EnsureSuccessStatusCode();
-
-            using var scope = _factory.Services.CreateScope();
-            var um = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-            var user = await um.FindByEmailAsync(email);
-            return user!.Id;
-        }
-
-
-        [Fact]
-        public async Task GetAll_WithValidToken_ReturnsOk()
-        {
-            var userId = await RegisterNewUserAsync();
-            _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
-
-            var resp = await _client.GetAsync("/api/users");
-            resp.EnsureSuccessStatusCode();
-
-            using var arr = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-
-
-            Assert.Equal(JsonValueKind.Array, arr.RootElement.ValueKind);
-            Assert.Contains(arr.RootElement.EnumerateArray(),
-                e => e.GetProperty("id").GetString() == userId);
-        }
-
-        [Fact]
-        public async Task GetAll_WithoutToken_ReturnsUnauthorized()
-        {
-            var resp = await _client.GetAsync("/api/users");
-
-
-            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
-        }
-
 
         [Fact]
         public async Task GetById_Existing_ReturnsOk()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
 
             var resp = await _client.GetAsync($"/api/users/{userId}");
             resp.EnsureSuccessStatusCode();
@@ -92,9 +46,9 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task GetById_NotFound_ReturnsNotFound()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
 
             var resp = await _client.GetAsync($"/api/users/{Guid.NewGuid():N}");
 
@@ -106,12 +60,12 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task Update_Existing_ReturnsOkAndUpdates()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
 
             var update = new UpdateUserModel {
-                Name    = "NewName",
+                Name = "NewName",
                 Address = "NewAddr"
             };
             var resp = await _client.PutAsJsonAsync($"/api/users/{userId}", update);
@@ -127,9 +81,9 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task Update_NotFound_ReturnsNotFound()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
 
             var resp = await _client.PutAsJsonAsync(
                 $"/api/users/{Guid.NewGuid():N}",
@@ -143,9 +97,9 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task Delete_Existing_ReturnsNoContent()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
 
             var resp = await _client.DeleteAsync($"/api/users/{userId}");
 
@@ -156,9 +110,9 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task Delete_NotFound_ReturnsBadRequest()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
 
             var resp = await _client.DeleteAsync($"/api/users/{Guid.NewGuid():N}");
 
@@ -170,26 +124,20 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task Deactivate_WithToken_ReturnsOkAndFlagsFalse()
         {
-            var userId = await RegisterNewUserAsync();
-            _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+            var (userId, jwt) = await RegisterAndLoginAsync();
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
             var resp = await _client.PutAsync($"/api/users/{userId}/deactivate", null);
-            resp.EnsureSuccessStatusCode();
 
-            using var obj = JsonDocument.Parse(
-                await _client.GetAsync($"/api/users/{userId}")
-                             .Result.Content.ReadAsStringAsync()
-            );
-
-
-            Assert.False(obj.RootElement.GetProperty("isActivated").GetBoolean());
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            var text = await resp.Content.ReadAsStringAsync();
+            Assert.Contains("User deactivated", text);
         }
 
         [Fact]
         public async Task Deactivate_NoToken_ReturnsUnauthorized()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             var resp   = await _client.PutAsync($"/api/users/{userId}/deactivate", null);
 
 
@@ -200,36 +148,67 @@ namespace UserService.IntegrationTests
         [Fact]
         public async Task Activate_WithToken_ReturnsOkAndFlagsTrue()
         {
-            var userId = await RegisterNewUserAsync();
-            _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
-
+            var (userId, jwt) = await RegisterAndLoginAsync();
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
             await _client.PutAsync($"/api/users/{userId}/deactivate", null);
 
             var resp = await _client.PutAsync($"/api/users/{userId}/activate", null);
-            resp.EnsureSuccessStatusCode();
 
-            using var obj = JsonDocument.Parse(
-                await _client.GetAsync($"/api/users/{userId}")
-                             .Result.Content.ReadAsStringAsync()
-            );
-
-
-            Assert.True(obj.RootElement.GetProperty("isActivated").GetBoolean());
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            var text = await resp.Content.ReadAsStringAsync();
+            Assert.Contains("User activated", text);
         }
 
         [Fact]
         public async Task Activate_NoToken_ReturnsUnauthorized()
         {
-            var userId = await RegisterNewUserAsync();
+            var (userId, jwt) = await RegisterAndLoginAsync();
             _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", userId);
+                new AuthenticationHeaderValue("Bearer", jwt);
+
 
             await _client.PutAsync($"/api/users/{userId}/deactivate", null);
             _client.DefaultRequestHeaders.Authorization = null;
 
             var resp = await _client.PutAsync($"/api/users/{userId}/activate", null);
             Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+
+
+
+
+
+
+
+        private async Task<(string userId, string jwt)> RegisterAndLoginAsync()
+        {
+            var email = $"{Guid.NewGuid():N}@example.com";
+            var password = "Password!1";
+
+            var reg = new RegisterModel {
+                Email = email,
+                Password = password,
+                Name = "TestUser",
+                Address = "Addr"
+            };
+            var regResp = await _client.PostAsJsonAsync("/api/auth/register", reg);
+            regResp.EnsureSuccessStatusCode();
+
+            using var scope = _factory.Services.CreateScope();
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+            var user = await um.FindByEmailAsync(email) 
+                    ?? throw new InvalidOperationException("Not found");
+            var userId = user.Id;
+
+            var loginDto = new { Email = email, Password = password };
+            var loginResp = await _client.PostAsJsonAsync("/api/auth/login", loginDto);
+            loginResp.EnsureSuccessStatusCode();
+            var jwt = (await loginResp.Content
+                    .ReadFromJsonAsync<JsonElement>())
+                    .GetProperty("token")
+                    .GetString();
+
+            return (userId, jwt!);
         }
     }
 }

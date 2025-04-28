@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -23,13 +24,34 @@ namespace UserService.API.Middleware
             {
                 await _next(context);
             }
+            catch (ValidationException ex)
+            {
+                await HandleValidationExceptionAsync(context, ex);
+            }
             catch (Exception ex)
             {
-                await HandleExceptionAsync(context, ex);
+                await HandleGeneralExceptionAsync(context, ex);
             }
         }
 
-        private Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private Task HandleValidationExceptionAsync(HttpContext context, Exception exception)
+        {
+            _logger.LogWarning(exception, "Validation exception occurred.");
+
+            context.Response.ContentType = "application/problem+json";
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+            var problem = new ProblemDetails
+            {
+                Title = "Validation failed",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = exception.Message.Trim()
+            };
+
+            return context.Response.WriteAsJsonAsync(problem);
+        }
+
+        private Task HandleGeneralExceptionAsync(HttpContext context, Exception exception)
         {
             _logger.LogError(exception, "Unhandled exception occurred while processing the request.");
 

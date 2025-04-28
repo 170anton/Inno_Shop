@@ -9,6 +9,8 @@ using UserService.API.Controllers;
 using UserService.Application.DTOs;     
 using UserService.Domain.Entities;
 using UserService.Application.Interfaces;
+using MediatR;
+using UserService.Application.Commands;
 
 namespace UserService.Tests.Controllers
 {
@@ -19,6 +21,7 @@ namespace UserService.Tests.Controllers
         private readonly Mock<IEmailSender> _emailSenderMock;
         private readonly Mock<IConfiguration> _configurationMock;
         private readonly Mock<ITokenService> _tokenServiceMock;
+        private readonly Mock<IMediator> _mediatorMock;
         private readonly AuthController _controller;
 
         public AuthControllerTests()
@@ -29,6 +32,7 @@ namespace UserService.Tests.Controllers
             _emailSenderMock = new Mock<IEmailSender>();
             _configurationMock = new Mock<IConfiguration>();
             _tokenServiceMock = new Mock<ITokenService>();
+            _mediatorMock = new Mock<IMediator>();
              
             _configurationMock.Setup(c => c["AppSettings:ClientUrl"])
                 .Returns("http://localhost:4200");
@@ -49,82 +53,52 @@ namespace UserService.Tests.Controllers
                 _signInManagerMock.Object,
                 _emailSenderMock.Object,
                 _configurationMock.Object,
-                _tokenServiceMock.Object);
+                _tokenServiceMock.Object,
+                _mediatorMock.Object);
         }
 
         [Fact]
-        public async Task Register_ValidModel_ReturnsOk()
+        public async Task Register_ValidModel_CallsMediatorAndReturnsOk()
         {
-            var registerModel = new RegisterModel
-            {
-                Email = "test@example.com",
-                Password = "Test123",
-                Name = "Test User",
-                Address = "Test Address"
+            var model = new RegisterModel {
+                Email = "a@b.com",
+                Password = "P@ssw0rd!",
+                Name = "User",
+                Address = "Addr"
             };
+            var expected = "Registration successful. Check email.";
+            _mediatorMock
+                .Setup(m => m.Send(It.Is<RegisterUserCommand>(cmd =>
+                    cmd.Email == model.Email &&
+                    cmd.Password == model.Password &&
+                    cmd.Name == model.Name &&
+                    cmd.Address == model.Address
+                ), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expected);
 
-            _userManagerMock.Setup(um => um.CreateAsync(It.IsAny<User>(), It.IsAny<string>()))
-                .ReturnsAsync(IdentityResult.Success);
+            var result = await _controller.Register(model);
 
-            _userManagerMock.Setup(um => um.GenerateEmailConfirmationTokenAsync(It.IsAny<User>()))
-                .ReturnsAsync("test-token");
-
-
-
-            var result = await _controller.Register(registerModel);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Equal("Registration successful. Please check your email to confirm your account.", okResult.Value);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal(expected, ok.Value);
+            _mediatorMock.Verify(m => m.Send(It.IsAny<RegisterUserCommand>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
-        public async Task Register_CreationFails_ReturnsBadRequest()
+        public async Task Register_HandlerThrows_PropagatesException()
         {
-            var registerModel = new RegisterModel
-            {
-                Email = "test@example.com",
-                Password = "Password123",
-                Name = "Test User",
-                Address = "Test Address"
-            };
-
-            var identityError = new IdentityError { Description = "Creation failed" };
-            _userManagerMock.Setup(um => um.CreateAsync(It.IsAny<User>(), It.IsAny<string>()))
-                .ReturnsAsync(IdentityResult.Failed(identityError));
-
-
-            var result = await _controller.Register(registerModel);
-
-
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            var errors = badRequestResult.Value as IEnumerable<IdentityError>;
-            var errorString = string.Join(" ", errors.Select(e => e.Description));
-            Assert.Contains("Creation failed", errorString);
-        }
-
-
-        [Fact]
-        public async Task Register_InvalidModel_ReturnsBadRequest()
-        {
-            var invalidModel = new RegisterModel
-            {
-                Email = "",   
-                Password = "Test123",
-                Name = "",        
+            var model = new RegisterModel {
+                Email = "fail@b.com",
+                Password = "x",
+                Name = "User",
                 Address = null
             };
+            _mediatorMock
+                .Setup(m => m.Send(It.IsAny<RegisterUserCommand>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new ApplicationException("Something went wrong"));
 
-            _controller.ModelState.AddModelError("Email", "Email is required");
-            _controller.ModelState.AddModelError("Name", "Name is required");
-
-
-            var result = await _controller.Register(invalidModel);
-
-
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            Assert.NotNull(badRequestResult.Value);
+            await Assert.ThrowsAsync<ApplicationException>(() => _controller.Register(model));
         }
+
 
 
         [Fact]
@@ -277,165 +251,40 @@ namespace UserService.Tests.Controllers
 
 
         [Fact]
-        public async Task ForgotPassword_UserFound_SendsEmailAndReturnsOk()
+        public async Task ForgotPassword_ValidModel_CallsMediatorAndReturnsOk()
         {
-            var forgotModel = new ForgotPasswordModel { Email = "test@example.com" };
-            var user = new User { Id = "123", Email = "test@example.com" };
-            _userManagerMock.Setup(um => um.FindByEmailAsync(forgotModel.Email))
-                .ReturnsAsync(user);
-            _userManagerMock.Setup(um => um.GeneratePasswordResetTokenAsync(user))
-                .ReturnsAsync("reset-token");
-            _emailSenderMock.Setup(es => es.SendEmailAsync(user.Email, "Reset your password", It.IsAny<string>()))
-                .Returns(Task.CompletedTask);
-
-
-            var result = await _controller.ForgotPassword(forgotModel);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Contains("If an account with that email exists", okResult.Value.ToString());
-        }
-
-        [Fact]
-        public async Task ForgotPassword_UserNotFound_ReturnsOkWithGenericMessage()
-        {
-            var forgotModel = new ForgotPasswordModel { Email = "notfound@example.com" };
-            _userManagerMock.Setup(um => um.FindByEmailAsync(forgotModel.Email))
-                .ReturnsAsync((User)null);
-
-
-            var result = await _controller.ForgotPassword(forgotModel);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Contains("If an account with that email exists", okResult.Value.ToString());
-        }
-
-        [Fact]
-        public async Task ForgotPassword_InvalidModel_ReturnsBadRequest()
-        {
-            var model = new ForgotPasswordModel
-            {
-                Email = ""
-            };
-            _controller.ModelState.AddModelError("Email", "Email is required");
-
+            var model = new ForgotPasswordModel { Email = "a@b.com" };
+            _mediatorMock
+                .Setup(m => m.Send(It.Is<ForgotPasswordCommand>(cmd => cmd.Email == model.Email), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Unit.Value);
 
             var result = await _controller.ForgotPassword(model);
 
-
-            Assert.IsType<BadRequestObjectResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Contains("password reset link has been sent", ok.Value.ToString());
+            _mediatorMock.Verify(m => m.Send(It.IsAny<ForgotPasswordCommand>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
 
         [Fact]
-        public async Task ResetPassword_ValidModel_ReturnsOk()
+        public async Task ResetPassword_ValidModel_CallsMediatorAndReturnsOk()
         {
-            var resetModel = new ResetPasswordModel
-            {
-                UserId = "123",
-                Token = System.Net.WebUtility.UrlEncode("test-reset-token"),
-                NewPassword = "NewPassword",
-                ConfirmPassword = "NewPassword"
+            var model = new ResetPasswordModel {
+                UserId = "123", Token = "tok", NewPassword = "new", ConfirmPassword = "new"
             };
-            var user = new User { Id = "123", Email = "test@example.com" };
-            _userManagerMock.Setup(um => um.FindByIdAsync(resetModel.UserId))
-                .ReturnsAsync(user);
-            _userManagerMock.Setup(um => um.ResetPasswordAsync(user, "test-reset-token", resetModel.NewPassword))
-                .ReturnsAsync(IdentityResult.Success);
-
-
-            var result = await _controller.ResetPassword(resetModel);
-
-
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Equal("Password has been reset successfully.", okResult.Value);
-        }
-
-        [Fact]
-        public async Task ResetPassword_PasswordsMismatch_ReturnsBadRequest()
-        {
-            var resetModel = new ResetPasswordModel
-            {
-                UserId = "123",
-                Token = System.Net.WebUtility.UrlEncode("test-reset-token"),
-                NewPassword = "NewPassword",
-                ConfirmPassword = "DifferentPassword"
-            };
-
-            var result = await _controller.ResetPassword(resetModel);
-
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            Assert.Equal("Passwords do not match.", badRequestResult.Value);
-        }
-
-        [Fact]
-        public async Task ResetPassword_UserNotFound_ReturnsNotFound()
-        {
-            var resetModel = new ResetPasswordModel
-            {
-                UserId = "nonexistent",
-                Token = System.Net.WebUtility.UrlEncode("test-reset-token"),
-                NewPassword = "NewPassword",
-                ConfirmPassword = "NewPassword"
-            };
-
-            _userManagerMock.Setup(um => um.FindByIdAsync(resetModel.UserId))
-                .ReturnsAsync((User)null);
-
-
-            var result = await _controller.ResetPassword(resetModel);
-
-
-            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
-            Assert.Equal("User not found.", notFoundResult.Value);
-        }
-
-        [Fact]
-        public async Task ResetPassword_InvalidToken_ReturnsBadRequest()
-        {
-            var resetModel = new ResetPasswordModel
-            {
-                UserId = "123",
-                Token = System.Net.WebUtility.UrlEncode("invalid-token"),
-                NewPassword = "NewPassword",
-                ConfirmPassword = "NewPassword"
-            };
-            var user = new User { Id = "123", Email = "test@example.com" };
-
-            _userManagerMock.Setup(um => um.FindByIdAsync(resetModel.UserId))
-                .ReturnsAsync(user);
-            _userManagerMock.Setup(um => um.ResetPasswordAsync(user, "invalid-token", resetModel.NewPassword))
-                .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "Invalid token" }));
-
-
-            var result = await _controller.ResetPassword(resetModel);
-
-
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-            
-            var errors = badRequestResult.Value as IEnumerable<IdentityError>;
-            var errorString = string.Join(" ", errors.Select(e => e.Description));
-            Assert.Contains("Invalid token", errorString);
-        }
-
-        [Fact]
-        public async Task ResetPassword_InvalidModel_ReturnsBadRequest()
-        {
-            var model = new ResetPasswordModel
-            {
-                UserId = "123",
-                Token = "",
-                NewPassword = "NewPassword123",
-                ConfirmPassword = "NewPassword123"
-            };
-            _controller.ModelState.AddModelError("Token", "Token is required");
-
+            _mediatorMock
+                .Setup(m => m.Send(It.Is<ResetPasswordCommand>(cmd =>
+                    cmd.UserId == model.UserId &&
+                    cmd.Token  == model.Token &&
+                    cmd.NewPassword == model.NewPassword
+                ), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Unit.Value);
 
             var result = await _controller.ResetPassword(model);
 
-
-            Assert.IsType<BadRequestObjectResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal("Password has been reset successfully.", ok.Value);
+            _mediatorMock.Verify(m => m.Send(It.IsAny<ResetPasswordCommand>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
 

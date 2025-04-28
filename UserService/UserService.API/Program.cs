@@ -7,40 +7,28 @@ using UserService.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using UserService.API.Services;
 using UserService.Domain.Entities;
-using UserService.Infrastructure;
 using FluentValidation.AspNetCore;
 using FluentValidation;
-using UserService.Application.Validators;
 using UserService.Infrastructure.Services;
+using MediatR;
+using UserService.Application.Commands;
+using UserService.Infrastructure.Behaviors;
 
 var builder = WebApplication.CreateBuilder(args);
-
 var env = builder.Environment;
 
 if (env.IsEnvironment("IntegrationTests"))
-{
-    builder.Services.AddDbContext<UserDbContext>(opts =>
-        opts.UseInMemoryDatabase("InMemoryTestDb"));
-}
+    builder.Services.AddDbContext<UserDbContext>(o => o.UseInMemoryDatabase("TestDb"));
 else
-{
-    builder.Services.AddDbContext<UserDbContext>(opts =>
-        opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-}
+    builder.Services.AddDbContext<UserDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
 
 builder.Services.AddDefaultIdentity<User>(options => {
-    if (builder.Environment.IsEnvironment("IntegrationTests"))
-    {
-        options.SignIn.RequireConfirmedAccount = false;
-    }
-    else
-    {
-        options.SignIn.RequireConfirmedAccount = true;
-    }
+    options.SignIn.RequireConfirmedAccount = !env.IsEnvironment("IntegrationTests");
+
     
     options.Password.RequireDigit = false;
     options.Password.RequiredLength = 1;
@@ -50,29 +38,21 @@ builder.Services.AddDefaultIdentity<User>(options => {
 })
 .AddEntityFrameworkStores<UserDbContext>();
 
-builder.Services.AddRazorPages();
+builder.Services.AddMediatR(typeof(RegisterUserCommand).Assembly);
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService.Application.Services.UserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddTransient<IEmailSender, EmailSender>();
-
-
-builder.Services.AddControllers();
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssemblyContaining<ForgotPasswordModelValidator>();
-builder.Services.AddValidatorsFromAssemblyContaining<RegisterModelValidator>();
-builder.Services.AddValidatorsFromAssemblyContaining<ResetPasswordModelValidator>();
-builder.Services.AddValidatorsFromAssemblyContaining<UpdateUserModelValidator>();
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
 builder.Services.AddHttpClient<IProductServiceClient, ProductServiceClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["ProductService:BaseUrl"] 
     ?? throw new InvalidOperationException("ProductService:BaseUrl is not configured."));
 });
+
 
 builder.Services.AddAuthentication(options =>
 {
@@ -95,6 +75,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -129,6 +110,8 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 
 
 var app = builder.Build();
@@ -140,13 +123,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
 
     if (env.IsEnvironment("IntegrationTests"))
-    {
         db.Database.EnsureCreated();
-    }
     else
-    {
         db.Database.Migrate();
-    }
 }
 
 if (app.Environment.IsDevelopment())
@@ -164,7 +143,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
-
 app.MapControllers();
 
 app.Run();

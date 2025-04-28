@@ -1,11 +1,10 @@
 using FluentValidation;
-using UserService.Application.DTOs;
 
-namespace UserService.Application.Validators
+namespace UserService.Application.Commands
 {
-    public class ResetPasswordModelValidator : AbstractValidator<ResetPasswordModel>
+    public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordCommand>
     {
-        public ResetPasswordModelValidator()
+        public ResetPasswordCommandValidator()
         {
             RuleFor(x => x.UserId)
                 .NotEmpty().WithMessage("UserId is required.");

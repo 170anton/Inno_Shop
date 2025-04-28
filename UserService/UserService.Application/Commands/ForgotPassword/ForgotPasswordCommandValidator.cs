@@ -1,11 +1,10 @@
 using FluentValidation;
-using UserService.Application.DTOs;
 
-namespace UserService.Application.Validators
+namespace UserService.Application.Commands
 {
-    public class ForgotPasswordModelValidator : AbstractValidator<ForgotPasswordModel>
+    public class ForgotPasswordCommandValidator : AbstractValidator<ForgotPasswordCommand>
     {
-        public ForgotPasswordModelValidator()
+        public ForgotPasswordCommandValidator()
         {
             RuleFor(x => x.Email)
                 .NotEmpty().WithMessage("Email is required.")

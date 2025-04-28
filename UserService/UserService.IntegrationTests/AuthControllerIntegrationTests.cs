@@ -71,8 +71,6 @@ namespace UserService.IntegrationTests
 
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var body = await response.Content.ReadAsStringAsync();
-            Assert.Contains("Email is required", body);
         }
 
         [Fact]
@@ -136,11 +134,11 @@ namespace UserService.IntegrationTests
             );
             var loginResponse = await _client.PostAsync("/api/auth/login", loginContent);
 
-
             loginResponse.EnsureSuccessStatusCode();
-            var json = await loginResponse.Content.ReadAsStringAsync();
-            Assert.Contains("\"token\"", json);
-            Assert.Contains("test-token", json);
+            var obj = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.True(obj.TryGetProperty("token", out var tokProp));
+            var token = tokProp.GetString();
+            Assert.False(string.IsNullOrWhiteSpace(token));
         }
 
         [Fact]

@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using UserService.Domain.Entities;
 using UserService.Application.DTOs;
 using System.Net.Http.Headers;
+using MediatR;
+using UserService.Application.Commands;
 
 namespace UserService.API.Controllers
 {
@@ -17,18 +19,16 @@ namespace UserService.API.Controllers
     {
         private readonly IUserService _userService;
         private readonly IProductServiceClient _productServiceClient;
+        private readonly IMediator _mediator;
         
-        public UsersController(IUserService userService, IProductServiceClient productServiceClient)
+        public UsersController(
+            IUserService userService, 
+            IProductServiceClient productServiceClient,
+            IMediator mediator)
         {
             _userService = userService;
             _productServiceClient = productServiceClient;
-        }
-        
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
-        {
-            IEnumerable<User> users = await _userService.GetAllAsync();
-            return Ok(users);
+            _mediator = mediator;
         }
         
         [HttpGet("{id}")]
@@ -43,33 +43,27 @@ namespace UserService.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateUserModel model)
         {
-            User? user = await _userService.GetByIdAsync(id);
-            if (user == null)
+            try
+            {    
+                var updated = await _mediator.Send(new UpdateUserCommand
+                {
+                    UserId = id,
+                    Email = model.Email,
+                    Name = model.Name,
+                    Address = model.Address
+                });
+
+                return Ok(updated);
+            }
+            catch (KeyNotFoundException)
+            {
                 return NotFound();
-
-            if (!string.IsNullOrWhiteSpace(model.Email))
-            {
-                user.Email = model.Email;
-                user.UserName = model.Email;
             }
-            
-            if (!string.IsNullOrWhiteSpace(model.Name))
+            catch (ApplicationException ex)
             {
-                user.Name = model.Name;
+                return BadRequest(ex.Message);
             }
-            
-            if (!string.IsNullOrWhiteSpace(model.Address))
-            {
-                user.Address = model.Address;
-            }
-
-            IdentityResult result = await _userService.UpdateUserAsync(user);
-            if (result.Succeeded)
-                return Ok(user);
-            else
-                return BadRequest(result.Errors);
         }
-
         
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
