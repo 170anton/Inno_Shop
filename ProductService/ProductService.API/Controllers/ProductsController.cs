@@ -1,10 +1,13 @@
+using System;
 using System.Security.Claims;
+using System.Threading.Tasks;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ProductService.Application.Commands;
 using ProductService.Application.DTOs;
 using ProductService.Application.Interfaces;
 using ProductService.Domain.Entities;
-
 
 namespace ProductService.API.Controllers
 {
@@ -14,8 +17,14 @@ namespace ProductService.API.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _service;
-        public ProductsController(IProductService service) => _service = service;
-        
+        private readonly IMediator _mediator;
+
+        public ProductsController(IProductService service, IMediator mediator)
+        {
+            _service = service;
+            _mediator = mediator;
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -51,18 +60,25 @@ namespace ProductService.API.Controllers
             if (!Guid.TryParse(userIdString, out var userId))
                 return Unauthorized();
 
-            var product = new Product
-            {
-                Name = dto.Name,
-                Description = dto.Description,
-                Price  = dto.Price,
-                IsAvailable = dto.IsAvailable,
-                CreatedByUserId = userId
-            };
+            var cmd = new CreateProductCommand(
+                dto.Name,
+                dto.Description,
+                dto.Price,
+                dto.IsAvailable,
+                userId
+            );
 
-            await _service.AddProductAsync(product);
-            return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
+            Guid newId = await _mediator.Send(cmd);
+
+            var createdProduct = await _service.GetProductByIdAsync(newId);
+
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = newId },
+                createdProduct
+            );
         }
+
 
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductDto dto)
@@ -76,15 +92,17 @@ namespace ProductService.API.Controllers
                 return Unauthorized();
 
             if (existing.CreatedByUserId != userId)
-                return StatusCode(StatusCodes.Status403Forbidden,
-                                  "You are not allowed to modify this product.");
+                return Forbid("You are not allowed to modify this product.");
 
-            if (dto.Name is not null) existing.Name        = dto.Name;
-            if (dto.Description is not null) existing.Description = dto.Description;
-            if (dto.Price is not null) existing.Price       = dto.Price.Value;
-            if (dto.IsAvailable is not null) existing.IsAvailable = dto.IsAvailable.Value;
+            await _mediator.Send(new UpdateProductCommand(
+                id,
+                dto.Name,
+                dto.Description,
+                dto.Price,
+                dto.IsAvailable,
+                userId
+            ));
 
-            await _service.UpdateProductAsync(existing);
             return NoContent();
         }
 
@@ -109,6 +127,13 @@ namespace ProductService.API.Controllers
         [HttpPut("deactivate/{userId:guid}")]
         public async Task<IActionResult> DeactivateProductsByUserId(Guid userId)
         {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdString, out var currentUserId))
+                return Unauthorized();
+
+            if (currentUserId != userId)
+                return Forbid();
+
             await _service.SetProductsDeletionStatusAsync(userId, true);
             return NoContent();
         }
@@ -116,6 +141,13 @@ namespace ProductService.API.Controllers
         [HttpPut("activate/{userId:guid}")]
         public async Task<IActionResult> ActivateProductsByUserId(Guid userId)
         {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdString, out var currentUserId))
+                return Unauthorized();
+
+            if (currentUserId != userId)
+                return Forbid();
+
             await _service.SetProductsDeletionStatusAsync(userId, false);
             return NoContent();
         }
@@ -123,7 +155,11 @@ namespace ProductService.API.Controllers
         [HttpGet("search")]
         public async Task<IActionResult> SearchProducts([FromQuery] ProductSearchCriteria criteria)
         {
-            var products = await _service.SearchProductsAsync(criteria);
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdString, out var userId))
+                return Unauthorized();
+
+            var products = await _service.SearchProductsByUserAsync(userId, criteria);
             return Ok(products);
         }
     }

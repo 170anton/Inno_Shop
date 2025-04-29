@@ -86,5 +86,26 @@ namespace ProductService.Application.Services
 
             return await query.ToListAsync();
         }
+
+        public async Task<IEnumerable<Product>> SearchProductsByUserAsync(Guid userId, ProductSearchCriteria criteria)
+        {
+            IQueryable<Product> query = _repository.GetProductsQuery()
+                .Where(p => p.CreatedByUserId == userId);
+
+            if (!string.IsNullOrWhiteSpace(criteria.Name))
+                query = query.Where(p => p.Name.Contains(criteria.Name));
+
+            if (criteria.MinPrice.HasValue)
+                query = query.Where(p => p.Price >= criteria.MinPrice.Value);
+
+            if (criteria.MaxPrice.HasValue)
+                query = query.Where(p => p.Price <= criteria.MaxPrice.Value);
+
+            if (criteria.IsAvailable.HasValue)
+                query = query.Where(p => p.IsAvailable == criteria.IsAvailable.Value);
+
+            return await query.ToListAsync();
+        }
+
     }
 }

@@ -11,21 +11,24 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using ProductService.Application.Validators;
 using System.IdentityModel.Tokens.Jwt;
+using MediatR;
+using ProductService.Application.Commands;
+using ProductService.Infrastructure.Behaviors;
 
 var builder = WebApplication.CreateBuilder(args);
-
-
 var env = builder.Environment;
+
 if (env.IsEnvironment("IntegrationTests"))
-{
     builder.Services.AddDbContext<ProductDbContext>(opts =>
         opts.UseInMemoryDatabase("InMemoryTestDb"));
-}
 else
-{
     builder.Services.AddDbContext<ProductDbContext>(opts =>
         opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-}
+
+builder.Services.AddMediatR(typeof(CreateProductCommand).Assembly);
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateProductCommandValidator>();
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IProductService, ProductService.Application.Services.ProductService>();
@@ -52,8 +55,6 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
 });
-
-
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -91,27 +92,23 @@ builder.Services.AddSwaggerGen(options =>
 
 
 builder.Services.AddControllers();
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssemblyContaining<ProductValidator>();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+
 
 var app = builder.Build();
 
+app.UseMiddleware<ProductService.API.Middleware.GlobalExceptionMiddleware>();
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
 
     if (env.IsEnvironment("IntegrationTests"))
-    {
         db.Database.EnsureCreated();
-    }
     else
-    {
         db.Database.Migrate();
-    }
 }
 
 if (app.Environment.IsDevelopment())

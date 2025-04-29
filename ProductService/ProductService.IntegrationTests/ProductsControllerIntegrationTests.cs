@@ -180,19 +180,19 @@ namespace ProductService.IntegrationTests
             Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
         }
 
-        // [Fact]
-        // public async Task DeactivateProductsByUserId_NoAuth_ReturnsUnauthorized()
-        // {
-        //     var client = _factory.CreateClient();
-        //     var resp   = await client.PutAsync($"/api/products/deactivate/{_testUserId}", null);
-        //     Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
-        // }
+        [Fact]
+        public async Task DeactivateProductsByUserId_NoRights_ReturnForbidden()
+        {
+            var client = _factory.CreateClient();
+            var resp = await client.PutAsync($"/api/products/deactivate/{_testUserId}", null);
+            Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+        }
 
         [Fact]
         public async Task ActivateProductsByUserId_AnyUser_ReturnsNoContent()
         {
             var client = CreateClient(_testUserId.ToString());
-            var resp   = await client.PutAsync($"/api/products/activate/{_testUserId}", null);
+            var resp = await client.PutAsync($"/api/products/activate/{_testUserId}", null);
             Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
         }
 

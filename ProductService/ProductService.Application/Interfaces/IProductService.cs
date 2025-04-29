@@ -16,6 +16,8 @@ namespace ProductService.Application.Interfaces
         Task DeleteProductAsync(Guid id);
         Task SetProductsDeletionStatusAsync(Guid userId, bool isDeleted);
         Task<IEnumerable<Product>> SearchProductsAsync(ProductSearchCriteria criteria);
+        Task<IEnumerable<Product>> SearchProductsByUserAsync(Guid userId, ProductSearchCriteria criteria);
+
 
     }
 }
